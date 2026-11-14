@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Files | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">My Files</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">🗂️ My Files</h1>
+  <p class="subtitle">Upload your own study materials — PDFs, images, Word documents, videos and audio. Uploaded PDFs automatically appear in the Textbook reader, and everything syncs to your account so it follows you to your phone and other laptops. Click a category header to open or close it.</p>
+
+  <div class="g-card">
+    <h3>➕ Upload files</h3>
+    <div class="drop-zone" id="drop-zone">Drop files here, or click to browse<br><span class="muted small">PDF · Images · Videos · Audio · DOCX · TXT</span></div>
+    <input type="file" id="f-input" multiple hidden>
+    <p class="muted small" id="f-status"></p>
+  </div>
+
+  <div id="f-cats"></div>
+
+  <!-- preview modal -->
+  <div class="modal hidden" id="f-modal">
+    <div class="modal-box">
+      <button class="modal-close" id="f-modal-close">✕</button>
+      <div id="f-modal-body"></div>
+    </div>
+  </div>
+
+  <footer class="page-foot">Files are stored in this browser and synced to your cloud storage (Supabase) — open the site on any device and your files are there. Very large files (over 40 MB) stay on this device only.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var CATS = [
+    { id: 'pdf', icon: '📚', label: 'PDF books' },
+    { id: 'image', icon: '🖼️', label: 'Images' },
+    { id: 'video', icon: '🎬', label: 'Videos' },
+    { id: 'audio', icon: '🎵', label: 'Audio' },
+    { id: 'doc', icon: '📄', label: 'Documents' },
+    { id: 'other', icon: '📦', label: 'Other files' }
+  ];
+  var openCats = JL.pref('file_cats') || {};
+  var curUrl = null;
+  var zoomLevel = 1;
+
+  function fmtSize(n) {
+    if (n == null) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  function closePreview() {
+    document.getElementById('f-modal').classList.add('hidden');
+    if (curUrl) { URL.revokeObjectURL(curUrl); curUrl = null; }
+    document.getElementById('f-modal-body').innerHTML = '';
+  }
+  function applyZoom() {
+    var area = document.getElementById('f-zoom-area');
+    if (area) area.style.width = Math.round(zoomLevel * 100) + '%';
+    var lbl = document.getElementById('f-zoom-val');
+    if (lbl) lbl.textContent = Math.round(zoomLevel * 100) + '%';
+  }
+  function preview(rec) {
+    var body = document.getElementById('f-modal-body');
+    var url = URL.createObjectURL(rec.blob);
+    curUrl = url;
+    zoomLevel = 1;
+    var zoomable = rec.cat === 'pdf' || rec.cat === 'image' || rec.cat === 'doc' || rec.cat === 'other';
+    var head = '<h3>' + JL.esc(rec.name) + ' <span class="muted small">(' + fmtSize(rec.size) + ') · <span id="f-zoom-val">100%</span></span></h3>' +
+      '<div class="toolbar">' +
+      (zoomable ? '<button class="btn small" id="fz-out">➖ Zoom out</button> <button class="btn small" id="fz-in">➕ Zoom in</button> <button class="btn small ghost" id="fz-reset">↺ 100%</button> ' : '') +
+      '<a class="btn small primary" href="' + url + '" download="' + JL.esc(rec.name) + '">⬇ Download</a>' +
+      (rec.cat === 'pdf' ? ' <span class="muted small">Tip: also readable (with zoom) in the Textbook reader.</span>' : '') +
+      '</div>';
+    var inner = '';
+    if (rec.cat === 'pdf') {
+      inner = '<iframe src="' + url + '" style="width:100%;height:70vh;border:1px solid #ccc;border-radius:8px"></iframe>';
+    } else if (rec.cat === 'image') {
+      inner = '<div class="preview-box"><img src="' + url + '"></div>';
+    } else if (rec.cat === 'audio') {
+      inner = '<audio controls src="' + url + '" style="width:100%"></audio>';
+    } else if (rec.cat === 'video') {
+      inner = '<div class="preview-box"><video controls src="' + url + '"></video></div>';
+    } else {
+      inner = '<p class="muted">This file type cannot be previewed in the browser.</p>';
+    }
+    body.innerHTML = head + '<div class="zoom-wrap" id="f-zoom-area">' + inner + '</div>';
+    if (zoomable) {
+      document.getElementById('fz-in').onclick = function () { zoomLevel = Math.min(4, zoomLevel + 0.25); applyZoom(); };
+      document.getElementById('fz-out').onclick = function () { zoomLevel = Math.max(0.5, zoomLevel - 0.25); applyZoom(); };
+      document.getElementById('fz-reset').onclick = function () { zoomLevel = 1; applyZoom(); };
+    }
+    document.getElementById('f-modal').classList.remove('hidden');
+  }
+
+  function render() {
+    JL.files.list().then(function (rows) {
+      var total = rows.reduce(function (s, r) { return s + (r.size || 0); }, 0);
+      document.getElementById('f-status').textContent = rows.length ? (rows.length + ' file(s) stored · ' + fmtSize(total)) : 'No files yet.';
+      var el = document.getElementById('f-cats');
+      el.innerHTML = '';
+      CATS.forEach(function (cat) {
+        var items = rows.filter(function (r) { return r.cat === cat.id; });
+        var d = document.createElement('details');
+        d.className = 'g-card cat-card';
+        d.open = openCats[cat.id] !== false;
+        d.innerHTML = '<summary><h3 style="display:inline-block">' + cat.icon + ' ' + cat.label + ' <span class="muted small">(' + items.length + ')</span> <span class="muted small">— click to open/close</span></h3></summary>';
+        d.addEventListener('toggle', function () {
+          openCats[cat.id] = d.open;
+          JL.pref('file_cats', openCats);
+        });
+        if (items.length) {
+          var box = document.createElement('div');
+          box.innerHTML = items.map(function (r) {
+            return '<div class="file-row">' +
+              '<span class="fname"><b>' + JL.esc(r.name) + '</b> <span class="muted small">' + fmtSize(r.size) + '</span></span>' +
+              '<button class="btn small" data-prev="' + r.id + '">' + (r.cat === 'pdf' ? '📖' : '👁') + ' Open</button> ' +
+              '<a class="btn small ghost" data-dl="' + r.id + '" href="#">⬇</a> ' +
+              '<button class="btn small ghost" data-del="' + r.id + '">🗑 Delete</button></div>';
+          }).join('');
+          d.appendChild(box);
+        } else {
+          var p = document.createElement('p');
+          p.className = 'muted small';
+          p.textContent = 'Nothing here yet — upload some files above.';
+          d.appendChild(p);
+        }
+        el.appendChild(d);
+      });
+      Array.prototype.forEach.call(el.querySelectorAll('[data-prev]'), function (b) {
+        b.onclick = function () {
+          JL.files.get(b.dataset.prev).then(function (rec) {
+            if (rec) preview({ name: rec.name, cat: rec.cat || JL.files.cat(rec.name, rec.type), size: rec.size, blob: rec.blob });
+          }).catch(function () { JL.toast('Could not load this file.'); });
+        };
+      });
+      Array.prototype.forEach.call(el.querySelectorAll('[data-dl]'), function (a) {
+        var id = a.dataset.dl;
+        JL.files.get(id).then(function (rec) {
+          if (!rec) return;
+          var u = URL.createObjectURL(rec.blob);
+          a.href = u;
+          a.setAttribute('download', rec.name);
+          setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+        });
+      });
+      Array.prototype.forEach.call(el.querySelectorAll('[data-del]'), function (b) {
+        b.onclick = function () {
+          if (!confirm('Delete this file? You cannot undo this.')) return;
+          JL.files.del(b.dataset.del).then(render);
+        };
+      });
+    });
+  }
+
+  function storeFiles(list) {
+    if (!list.length) return;
+    var n = list.length, done = 0;
+    Array.prototype.forEach.call(list, function (f) {
+      var meta = {
+        id: 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        name: f.name, type: f.type, cat: JL.files.cat(f.name, f.type),
+        size: f.size, added: new Date().toISOString()
+      };
+      var tooBig = f.size > 40 * 1024 * 1024;
+      if (tooBig) JL.toast(f.name + ' is over 40 MB — it will stay on this device only.');
+      JL.files.put(meta, f).then(function () {
+        done++;
+        document.getElementById('f-status').textContent = 'Saving… ' + done + '/' + n;
+        if (done === n) { JL.toast('Saved ' + n + ' file(s)!'); render(); }
+      }).catch(function () {
+        done++;
+        JL.toast('Could not save ' + f.name);
+        if (done === n) render();
+      });
+      /* cloud upload (Supabase storage), when configured, happens inside JL.files.put */
+    });
+  }
+
+  var dz = document.getElementById('drop-zone');
+  dz.onclick = function () { document.getElementById('f-input').click(); };
+  document.getElementById('f-input').onchange = function () {
+    storeFiles(Array.prototype.slice.call(this.files));
+    this.value = '';
+  };
+  dz.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', function () { dz.classList.remove('drag'); });
+  dz.addEventListener('drop', function (e) {
+    e.preventDefault();
+    dz.classList.remove('drag');
+    storeFiles(Array.prototype.slice.call(e.dataTransfer.files));
+  });
+  document.getElementById('f-modal-close').onclick = closePreview;
+  document.getElementById('f-modal').onclick = function (e) { if (e.target === this) closePreview(); };
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add / Edit | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">設定</span><span class="brand-title">Add / Edit Content</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">⚙️ Add / Edit Content</h1>
+  <p class="subtitle">Add your own vocabulary, grammar, kanji and practice tests — or edit any existing entry. Your changes are saved in this browser and appear everywhere in the site immediately.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="vocab">Vocabulary</button>
+    <button class="tab" data-tab="grammar">Grammar</button>
+    <button class="tab" data-tab="kanji">Kanji</button>
+    <button class="tab" data-tab="tests">Tests</button>
+    <button class="tab" data-tab="data">Backup</button>
+  </div>
+
+  <!-- VOCAB -->
+  <div id="panel-vocab" class="tab-panel active">
+    <div class="g-card">
+      <h3 id="vocab-form-title">➕ Add vocabulary</h3>
+      <div class="form-grid">
+        <label class="f">Japanese (word) <input type="text" id="v-jp" placeholder="例：お弁当"></label>
+        <label class="f">Reading (kana) <input type="text" id="v-rd" placeholder="おべんとう"></label>
+        <label class="f">Romaji <input type="text" id="v-ro" placeholder="obentou"></label>
+        <label class="f">English meaning <input type="text" id="v-en" placeholder="boxed lunch"></label>
+        <label class="f">Burmese meaning <input type="text" id="v-mm" placeholder="ထမင်းထုပ်"></label>
+        <label class="f">Category <input type="text" id="v-cat" placeholder="My words"></label>
+      </div>
+      <button class="btn primary" id="v-save">💾 Save word</button>
+      <button class="btn ghost" id="v-new">✨ New / clear</button>
+      <span class="muted small" id="v-msg"></span>
+    </div>
+    <div class="toolbar"><input type="search" id="v-list-search" placeholder="Search your words…" style="flex:1;min-width:200px"><span class="muted small" id="v-list-count"></span></div>
+    <div id="v-list"></div>
+  </div>
+
+  <!-- GRAMMAR -->
+  <div id="panel-grammar" class="tab-panel">
+    <div class="g-card">
+      <h3 id="g-form-title">➕ Add grammar point</h3>
+      <div class="form-grid">
+        <label class="f">Lesson no. <input type="number" id="gr-lesson" min="1" value="1"></label>
+        <label class="f">Title <input type="text" id="gr-title" placeholder="〜てください"></label>
+        <label class="f">Pattern <input type="text" id="gr-pattern" placeholder="〜てください"></label>
+        <label class="f">Meaning <input type="text" id="gr-meaning" placeholder="please do…"></label>
+      </div>
+      <label class="f" style="margin-top:8px">Explanation <textarea id="gr-expl" rows="2" style="width:100%"></textarea></label>
+      <h4>Examples</h4><div class="dyn-rows" id="gr-examples"></div>
+      <button class="btn small ghost" id="gr-add-ex">+ Add example</button>
+      <h4>Exercises (first option = correct answer)</h4><div class="dyn-rows" id="gr-exercises"></div>
+      <button class="btn small ghost" id="gr-add-exr">+ Add exercise</button>
+      <p style="margin-top:12px">
+        <button class="btn primary" id="gr-save">💾 Save grammar point</button>
+        <button class="btn ghost" id="gr-new">✨ New / clear</button>
+        <span class="muted small" id="gr-msg"></span>
+      </p>
+    </div>
+    <div id="gr-list"></div>
+  </div>
+
+  <!-- KANJI -->
+  <div id="panel-kanji" class="tab-panel">
+    <div class="g-card">
+      <h3 id="k-form-title">➕ Add kanji</h3>
+      <div class="form-grid">
+        <label class="f">Kanji <input type="text" id="k-kanji" placeholder="食" maxlength="2"></label>
+        <label class="f">On readings (comma separated) <input type="text" id="k-on" placeholder="ショク"></label>
+        <label class="f">Kun reading <input type="text" id="k-kun" placeholder="た(べる)"></label>
+        <label class="f">Burmese meaning <input type="text" id="k-mm" placeholder="စားသည်"></label>
+        <label class="f">English meaning <input type="text" id="k-en" placeholder="eat"></label>
+        <label class="f">Chapter <input type="number" id="k-chapter" min="1" value="1"></label>
+      </div>
+      <h4>Example words</h4><div class="dyn-rows" id="k-examples"></div>
+      <button class="btn small ghost" id="k-add-ex">+ Add example word</button>
+      <p style="margin-top:12px">
+        <button class="btn primary" id="k-save">💾 Save kanji</button>
+        <button class="btn ghost" id="k-new">✨ New / clear</button>
+        <span class="muted small" id="k-msg"></span>
+      </p>
+    </div>
+    <div class="toolbar"><input type="search" id="k-list-search" placeholder="Search kanji, readings or meanings…" style="flex:1;min-width:200px"></div>
+    <div id="k-list"></div>
+  </div>
+
+  <!-- TESTS -->
+  <div id="panel-tests" class="tab-panel">
+    <div class="g-card">
+      <h3>➕ Build your own quiz</h3>
+      <div class="form-grid">
+        <label class="f">Quiz title <input type="text" id="tq-title" placeholder="My N5 word test"></label>
+      </div>
+      <div class="dyn-rows" id="tq-questions"></div>
+      <button class="btn small ghost" id="tq-add">+ Add question</button>
+      <p><button class="btn primary" id="tq-save">💾 Save quiz</button> <button class="btn ghost" id="tq-new">✨ New / clear</button><span class="muted small" id="tq-msg"></span></p>
+    </div>
+    <div class="g-card">
+      <h3>➕ Build a flashcard deck</h3>
+      <div class="form-grid">
+        <label class="f">Deck title <input type="text" id="td-title" placeholder="My hard words"></label>
+      </div>
+      <div class="dyn-rows" id="td-cards"></div>
+      <button class="btn small ghost" id="td-add">+ Add card</button>
+      <p><button class="btn primary" id="td-save">💾 Save deck</button> <button class="btn ghost" id="td-new">✨ New / clear</button><span class="muted small" id="td-msg"></span></p>
+    </div>
+    <div id="t-list"></div>
+  </div>
+
+  <!-- BACKUP -->
+  <div id="panel-data" class="tab-panel">
+    <div class="g-card">
+      <h3>💾 Backup your additions</h3>
+      <p class="muted">Your additions and edits are stored only in this browser. Export a backup file before switching computers or clearing browser data.</p>
+      <p>
+        <button class="btn primary" id="d-export">⬇ Export my data (JSON)</button>
+        <label class="btn">⬆ Import backup <input type="file" id="d-import" accept=".json,application/json" hidden></label>
+        <button class="btn ghost" id="d-restore">♻️ Restore all deleted base items</button>
+        <button class="btn ghost" id="d-reset" style="color:var(--err)">🗑 Reset ALL my changes</button>
+      </p>
+      <p class="muted small" id="d-stats"></p>
+    </div>
+  </div>
+
+  <footer class="page-foot">Tip: exported backups can be shared with friends — they can import them on this same page.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var uid = function () { return 'u_' + Date.now() + '_' + Math.floor(Math.random() * 9999); };
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.onclick = function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    };
+  });
+
+  function rowsHtml(el, fields) {
+    var row = document.createElement('div'); row.className = 'dyn-row';
+    fields.forEach(function (f) {
+      var inp = document.createElement('input');
+      inp.type = 'text'; inp.placeholder = f.ph; if (f.cls) inp.className = f.cls;
+      if (f.w) inp.style.width = f.w;
+      row.appendChild(inp);
+    });
+    var rm = document.createElement('button');
+    rm.className = 'btn small ghost'; rm.textContent = '✕'; rm.style.color = 'var(--err)';
+    rm.onclick = function () { row.remove(); };
+    row.appendChild(rm);
+    el.appendChild(row);
+  }
+
+  function readRows(el) {
+    return Array.prototype.map.call(el.querySelectorAll('.dyn-row'), function (r) {
+      return Array.prototype.map.call(r.querySelectorAll('input'), function (i) { return i.value; });
+    });
+  }
+
+  /* ============ VOCAB ============ */
+  var editV = null;
+  function renderVocabList() {
+    var q = (document.getElementById('v-list-search').value || '').toLowerCase();
+    var all = JL.data('vocab');
+    var items = all.filter(function (v) {
+      return !q || [v.jp, v.rd, v.en, v.mm, v.cat].join(' ').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 400);
+    document.getElementById('v-list-count').textContent = all.length + ' words total (showing ' + items.length + ')';
+    var el = document.getElementById('v-list');
+    el.innerHTML = '<table class="list"><tr><th>Japanese</th><th>Reading</th><th>Meaning</th><th>Category</th><th></th></tr>' +
+      items.map(function (v) {
+        return '<tr><td class="jp"><b>' + JL.esc(v.jp) + '</b></td><td class="jp">' + JL.esc(v.rd || '') + '</td><td>' + JL.esc(v.en || v.mm || '') + '</td><td class="muted">' + JL.esc(v.cat || '') + '</td>' +
+          '<td><button class="btn small" data-edit="' + v.id + '">✏️</button> <button class="btn small ghost" data-del="' + v.id + '">🗑</button></td></tr>';
+      }).join('') + '</table>';
+    Array.prototype.forEach.call(el.querySelectorAll('[data-edit]'), function (b) {
+      b.onclick = function () {
+        var v = all.find(function (x) { return x.id === b.dataset.edit; });
+        editV = v;
+        document.getElementById('vocab-form-title').textContent = '✏️ Edit: ' + (v.jp || '');
+        document.getElementById('v-jp').value = v.jp || ''; document.getElementById('v-rd').value = v.rd || '';
+        document.getElementById('v-ro').value = v.romaji || ''; document.getElementById('v-en').value = v.en || '';
+        document.getElementById('v-mm').value = v.mm || ''; document.getElementById('v-cat').value = v.cat || '';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-del]'), function (b) {
+      b.onclick = function () {
+        var v = all.find(function (x) { return x.id === b.dataset.del; });
+        if (confirm('Remove “' + (v.jp || '') + '” from your study data?')) { JL.remove('vocab', b.dataset.del); renderVocabList(); JL.toast('Removed. Deleted base words can be restored in the Backup tab.'); }
+      };
+    });
+  }
+  document.getElementById('v-list-search').oninput = renderVocabList;
+  document.getElementById('v-save').onclick = function () {
+    var jp = document.getElementById('v-jp').value.trim();
+    if (!jp) { document.getElementById('v-msg').textContent = 'Japanese word is required.'; return; }
+    var item = editV || { id: uid() };
+    item.jp = jp;
+    item.rd = document.getElementById('v-rd').value.trim();
+    item.romaji = document.getElementById('v-ro').value.trim();
+    item.en = document.getElementById('v-en').value.trim();
+    item.mm = document.getElementById('v-mm').value.trim();
+    item.cat = document.getElementById('v-cat').value.trim() || 'My words';
+    JL.save('vocab', item);
+    document.getElementById('v-msg').textContent = '✓ Saved!';
+    editV = null;
+    document.getElementById('vocab-form-title').textContent = '➕ Add vocabulary';
+    ['v-jp', 'v-rd', 'v-ro', 'v-en', 'v-mm'].forEach(function (id) { document.getElementById(id).value = ''; });
+    renderVocabList();
+    setTimeout(function () { document.getElementById('v-msg').textContent = ''; }, 2500);
+  };
+  document.getElementById('v-new').onclick = function () {
+    editV = null;
+    ['v-jp', 'v-rd', 'v-ro', 'v-en', 'v-mm'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('vocab-form-title').textContent = '➕ Add vocabulary';
+  };
+
+  /* ============ GRAMMAR ============ */
+  var editG = null;
+  var EXF = [{ ph: 'Japanese 例：学校へ行きます。', cls: 'jp', w: '40%' }, { ph: 'Reading', cls: 'jp' }, { ph: 'English' }];
+  var QF = [{ ph: 'Question 例：学校___行きます。', cls: 'jp', w: '40%' }, { ph: '✔ Correct option', cls: 'jp' }, { ph: 'Wrong option', cls: 'jp' }, { ph: 'Wrong option', cls: 'jp' }];
+  rowsHtml(document.getElementById('gr-examples'), EXF);
+  document.getElementById('gr-add-ex').onclick = function () { rowsHtml(document.getElementById('gr-examples'), EXF); };
+  rowsHtml(document.getElementById('gr-exercises'), QF);
+  document.getElementById('gr-add-exr').onclick = function () { rowsHtml(document.getElementById('gr-exercises'), QF); };
+
+  function renderGrammarList() {
+    var all = JL.data('grammar').sort(function (a, b) { return (a.lesson || 0) - (b.lesson || 0); });
+    var el = document.getElementById('gr-list');
+    el.innerHTML = '<table class="list"><tr><th>#</th><th>Title</th><th>Pattern</th><th>Meaning</th><th></th></tr>' +
+      all.map(function (g) {
+        return '<tr><td>' + (g.lesson || '-') + '</td><td><b>' + JL.esc(g.title) + '</b></td><td class="jp">' + JL.esc(g.pattern || '') + '</td><td>' + JL.esc(g.meaning || '') + '</td>' +
+          '<td><button class="btn small" data-edit="' + g.id + '">✏️</button> <button class="btn small ghost" data-del="' + g.id + '">🗑</button></td></tr>';
+      }).join('') + '</table>';
+    Array.prototype.forEach.call(el.querySelectorAll('[data-edit]'), function (b) {
+      b.onclick = function () {
+        var g = all.find(function (x) { return x.id === b.dataset.edit; });
+        editG = g;
+        document.getElementById('g-form-title').textContent = '✏️ Edit: ' + (g.title || '');
+        document.getElementById('gr-lesson').value = g.lesson || 1;
+        document.getElementById('gr-title').value = g.title || '';
+        document.getElementById('gr-pattern').value = g.pattern || '';
+        document.getElementById('gr-meaning').value = g.meaning || '';
+        document.getElementById('gr-expl').value = g.explanation || '';
+        document.getElementById('gr-examples').innerHTML = '';
+        (g.examples || []).forEach(function (e) {
+          rowsHtml(document.getElementById('gr-examples'), EXF);
+          var ins = document.getElementById('gr-examples').lastChild.querySelectorAll('input');
+          ins[0].value = e.jp || ''; ins[1].value = e.rd || ''; ins[2].value = e.en || '';
+        });
+        document.getElementById('gr-exercises').innerHTML = '';
+        (g.exercises || []).forEach(function (x) {
+          rowsHtml(document.getElementById('gr-exercises'), QF);
+          var ins = document.getElementById('gr-exercises').lastChild.querySelectorAll('input');
+          ins[0].value = x.q || '';
+          (x.opts || []).forEach(function (o, i) { if (ins[i + 1]) ins[i + 1].value = o; });
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-del]'), function (b) {
+      b.onclick = function () { if (confirm('Remove this grammar point?')) { JL.remove('grammar', b.dataset.del); renderGrammarList(); } };
+    });
+  }
+  document.getElementById('gr-save').onclick = function () {
+    var title = document.getElementById('gr-title').value.trim();
+    if (!title) { document.getElementById('gr-msg').textContent = 'Title is required.'; return; }
+    var item = editG || { id: uid() };
+    item.lesson = parseInt(document.getElementById('gr-lesson').value, 10) || 1;
+    item.title = title;
+    item.pattern = document.getElementById('gr-pattern').value.trim();
+    item.meaning = document.getElementById('gr-meaning').value.trim();
+    item.explanation = document.getElementById('gr-expl').value.trim();
+    item.examples = readRows(document.getElementById('gr-examples')).filter(function (r) { return r[0]; })
+      .map(function (r) { return { jp: r[0], rd: r[1], en: r[2] }; });
+    item.exercises = readRows(document.getElementById('gr-exercises')).filter(function (r) { return r[0] && r[1]; })
+      .map(function (r) { return { q: r[0], opts: [r[1], r[2], r[3]].filter(Boolean), ans: 0 }; });
+    JL.save('grammar', item);
+    document.getElementById('gr-msg').textContent = '✓ Saved! The first option is treated as the correct answer.';
+    renderGrammarList();
+    setTimeout(function () { document.getElementById('gr-msg').textContent = ''; }, 4000);
+  };
+  document.getElementById('gr-new').onclick = function () {
+    editG = null;
+    document.getElementById('g-form-title').textContent = '➕ Add grammar point';
+    document.getElementById('gr-title').value = ''; document.getElementById('gr-pattern').value = '';
+    document.getElementById('gr-meaning').value = ''; document.getElementById('gr-expl').value = '';
+  };
+
+  /* ============ KANJI ============ */
+  var editK = null;
+  var KF = [{ ph: 'Word 例：食べます', cls: 'jp', w: '35%' }, { ph: 'Reading', cls: 'jp' }, { ph: 'Burmese/English meaning' }];
+  rowsHtml(document.getElementById('k-examples'), KF);
+  document.getElementById('k-add-ex').onclick = function () { rowsHtml(document.getElementById('k-examples'), KF); };
+  document.getElementById('k-save').onclick = function () {
+    var ch = document.getElementById('k-kanji').value.trim();
+    if (!ch) { document.getElementById('k-msg').textContent = 'Kanji character is required.'; return; }
+    var item = editK || { id: uid() };
+    item.kanji = ch;
+    item.on = document.getElementById('k-on').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    item.kun = document.getElementById('k-kun').value.trim();
+    item.meaning = document.getElementById('k-mm').value.trim();
+    item.en = document.getElementById('k-en').value.trim();
+    item.chapter = parseInt(document.getElementById('k-chapter').value, 10) || 1;
+    item.chapterTitle = 'My kanji';
+    item.examples = readRows(document.getElementById('k-examples')).filter(function (r) { return r[0]; })
+      .map(function (r) { return { word: r[0], reading: r[1], meaning: r[2] }; });
+    JL.save('kanji', item);
+    document.getElementById('k-msg').textContent = '✓ Saved!';
+    renderKanjiList();
+    setTimeout(function () { document.getElementById('k-msg').textContent = ''; }, 2500);
+  };
+  document.getElementById('k-new').onclick = function () {
+    editK = null;
+    document.getElementById('k-kanji').value = ''; document.getElementById('k-on').value = '';
+    document.getElementById('k-kun').value = ''; document.getElementById('k-mm').value = '';
+    document.getElementById('k-en').value = '';
+    document.getElementById('k-form-title').textContent = '➕ Add kanji';
+  };
+  function renderKanjiList() {
+    var q = (document.getElementById('k-list-search') ? document.getElementById('k-list-search').value : '') || '';
+    q = q.trim().toLowerCase();
+    var all = JL.data('kanji').filter(function (k) {
+      return !q || [k.kanji, (k.on || []).join(' '), k.kun, k.en, k.meaning].join(' ').toLowerCase().indexOf(q) >= 0 ||
+        (k.examples || []).some(function (e) { return (e.word + ' ' + e.reading + ' ' + e.meaning).toLowerCase().indexOf(q) >= 0; });
+    });
+    var el = document.getElementById('k-list');
+    el.innerHTML = '<table class="list"><tr><th>Kanji</th><th>On</th><th>Kun</th><th>Meaning</th><th>Ch.</th><th></th></tr>' +
+      all.map(function (k) {
+        return '<tr><td class="jp" style="font-size:1.3rem"><b>' + JL.esc(k.kanji) + '</b></td><td class="jp">' + JL.esc((k.on || []).join('·')) + '</td><td class="jp">' + JL.esc(k.kun || '') + '</td><td>' + JL.esc(k.en || k.meaning || '') + '</td><td>' + (k.chapter || '') + '</td>' +
+          '<td><button class="btn small" data-edit="' + k.id + '">✏️</button> <button class="btn small ghost" data-del="' + k.id + '">🗑</button></td></tr>';
+      }).join('') + '</table>';
+    Array.prototype.forEach.call(el.querySelectorAll('[data-edit]'), function (b) {
+      b.onclick = function () {
+        var k = all.find(function (x) { return x.id === b.dataset.edit; });
+        editK = k;
+        document.getElementById('k-form-title').textContent = '✏️ Edit: ' + k.kanji;
+        document.getElementById('k-kanji').value = k.kanji;
+        document.getElementById('k-on').value = (k.on || []).join(', ');
+        document.getElementById('k-kun').value = k.kun || '';
+        document.getElementById('k-mm').value = k.meaning || '';
+        document.getElementById('k-en').value = k.en || '';
+        document.getElementById('k-chapter').value = k.chapter || 1;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-del]'), function (b) {
+      b.onclick = function () { if (confirm('Remove this kanji?')) { JL.remove('kanji', b.dataset.del); renderKanjiList(); } };
+    });
+  }
+
+  /* ============ TESTS ============ */
+  var editTQ = null, editTD = null;
+  var QTF = [{ ph: 'Question 例：1 + 1 = ___', cls: 'jp', w: '40%' }, { ph: '✔ Correct option', cls: 'jp' }, { ph: 'Wrong option', cls: 'jp' }, { ph: 'Wrong option', cls: 'jp' }];
+  var TDF = [{ ph: 'Front 例：ありがとう', cls: 'jp', w: '50%' }, { ph: 'Back 例：thank you' }];
+  rowsHtml(document.getElementById('tq-questions'), QTF);
+  document.getElementById('tq-add').onclick = function () { rowsHtml(document.getElementById('tq-questions'), QTF); };
+  rowsHtml(document.getElementById('td-cards'), TDF);
+  document.getElementById('td-add').onclick = function () { rowsHtml(document.getElementById('td-cards'), TDF); };
+
+  document.getElementById('tq-save').onclick = function () {
+    var title = document.getElementById('tq-title').value.trim();
+    var rows = readRows(document.getElementById('tq-questions')).filter(function (r) { return r[0] && r[1]; });
+    if (!title || !rows.length) { document.getElementById('tq-msg').textContent = 'Title and at least one question are required.'; return; }
+    var questions = rows.map(function (r) {
+      var opts = JL.shuffle([r[1], r[2], r[3]].filter(Boolean));
+      return { q: r[0], opts: opts, ans: opts.indexOf(r[1]) };
+    });
+    var qid = editTQ || uid();
+    JL.save('tests', { id: qid, type: 'quiz', title: title, questions: questions });
+    editTQ = qid;
+    document.getElementById('tq-msg').textContent = '✓ Quiz saved! Take it in the Tests page.';
+    renderTestList();
+  };
+  document.getElementById('td-save').onclick = function () {
+    var title = document.getElementById('td-title').value.trim();
+    var rows = readRows(document.getElementById('td-cards')).filter(function (r) { return r[0] && r[1]; });
+    if (!title || !rows.length) { document.getElementById('td-msg').textContent = 'Title and at least one card are required.'; return; }
+    var did = editTD || uid();
+    JL.save('tests', { id: did, type: 'deck', title: title, cards: rows.map(function (r) { return { front: r[0], back: r[1] }; }) });
+    editTD = did;
+    document.getElementById('td-msg').textContent = '✓ Deck saved! Study it in the Tests page.';
+    renderTestList();
+  };
+  function userTests() {
+    var u = JSON.parse(localStorage.getItem('jl_user_v1') || '{}');
+    return ((u.tests || {}).added) || [];
+  }
+  function activateTab(name) {
+    var btn = document.querySelector('.tab[data-tab="' + name + '"]');
+    if (btn) btn.click();
+  }
+  function loadTestToBuilder(t) {
+    if (!t) return;
+    activateTab('tests');
+    if (t.type === 'quiz') {
+      editTQ = t.id; editTD = null;
+      document.getElementById('tq-title').value = t.title || '';
+      var qbox = document.getElementById('tq-questions');
+      qbox.innerHTML = '';
+      (t.questions || []).forEach(function (q) {
+        rowsHtml(qbox, QTF);
+        var ins = qbox.lastChild.querySelectorAll('input');
+        ins[0].value = q.q || '';
+        var ansIdx = q.ans != null ? q.ans : 0;
+        ins[1].value = (q.opts || [])[ansIdx] || '';
+        var wrongs = (q.opts || []).filter(function (o, i) { return i !== ansIdx; });
+        if (ins[2] && wrongs[0]) ins[2].value = wrongs[0];
+        if (ins[3] && wrongs[1]) ins[3].value = wrongs[1];
+      });
+      if (!(t.questions || []).length) rowsHtml(qbox, QTF);
+      document.getElementById('tq-msg').textContent = 'Editing “' + (t.title || '') + '” — Save will update it.';
+    } else {
+      editTD = t.id; editTQ = null;
+      document.getElementById('td-title').value = t.title || '';
+      var dbox = document.getElementById('td-cards');
+      dbox.innerHTML = '';
+      (t.cards || []).forEach(function (c) {
+        rowsHtml(dbox, TDF);
+        var ins = dbox.lastChild.querySelectorAll('input');
+        ins[0].value = c.front || ''; ins[1].value = c.back || '';
+      });
+      if (!(t.cards || []).length) rowsHtml(dbox, TDF);
+      document.getElementById('td-msg').textContent = 'Editing “' + (t.title || '') + '” — Save will update it.';
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.getElementById('tq-new').onclick = function () {
+    editTQ = null;
+    document.getElementById('tq-title').value = '';
+    document.getElementById('tq-questions').innerHTML = '';
+    rowsHtml(document.getElementById('tq-questions'), QTF);
+    document.getElementById('tq-msg').textContent = '';
+  };
+  document.getElementById('td-new').onclick = function () {
+    editTD = null;
+    document.getElementById('td-title').value = '';
+    document.getElementById('td-cards').innerHTML = '';
+    rowsHtml(document.getElementById('td-cards'), TDF);
+    document.getElementById('td-msg').textContent = '';
+  };
+  function renderTestList() {
+    var list = userTests();
+    var el = document.getElementById('t-list');
+    el.innerHTML = '<h3>Your tests</h3>' + (list.length ? '<table class="list"><tr><th>Title</th><th>Type</th><th>Size</th><th></th></tr>' +
+      list.map(function (t) {
+        var n = ((t.type === 'quiz' ? t.questions : t.cards) || []).length;
+        return '<tr><td><b>' + JL.esc(t.title) + '</b></td><td>' + (t.type === 'quiz' ? 'Quiz' : 'Deck') + '</td><td>' + n + '</td>' +
+          '<td><button class="btn small" data-edit="' + t.id + '">✏️</button> <button class="btn small ghost" data-del="' + t.id + '">🗑</button></td></tr>';
+      }).join('') + '</table>' : '<p class="muted">No tests yet.</p>');
+    Array.prototype.forEach.call(el.querySelectorAll('[data-edit]'), function (b) {
+      b.onclick = function () { loadTestToBuilder(userTests().find(function (x) { return x.id === b.dataset.edit; })); };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-del]'), function (b) {
+      b.onclick = function () { if (confirm('Delete this test?')) { JL.remove('tests', b.dataset.del); renderTestList(); } };
+    });
+  }
+  function handleEditDeepLink() {
+    var m = location.search.match(/[?&]t=(u_[^&]+)/);
+    if (!m) return;
+    var t = userTests().find(function (x) { return x.id === m[1]; });
+    if (t) loadTestToBuilder(t);
+  }
+
+  /* ============ BACKUP ============ */
+  function renderStats() {
+    var u = JSON.parse(localStorage.getItem('jl_user_v1') || '{}');
+    var counts = ['kanji', 'vocab', 'grammar', 'tests'].map(function (k) {
+      var s = u[k] || { added: [], edited: {}, deleted: {} };
+      return k + ': ' + (s.added || []).length + ' added, ' + Object.keys(s.edited || {}).length + ' edited, ' + Object.keys(s.deleted || {}).length + ' deleted';
+    });
+    document.getElementById('d-stats').textContent = counts.join(' · ');
+  }
+  document.getElementById('d-export').onclick = function () {
+    JL.download('japanese-learning-backup-' + new Date().toISOString().slice(0, 10) + '.json', localStorage.getItem('jl_user_v1') || '{}');
+  };
+  document.getElementById('d-import').onchange = function () {
+    var f = this.files[0]; if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!data || typeof data !== 'object') throw new Error('bad');
+        var cur = JSON.parse(localStorage.getItem('jl_user_v1') || '{}');
+        ['kanji', 'vocab', 'grammar', 'tests'].forEach(function (k) {
+          var imp = data[k] || { added: [], edited: {} };
+          var mine = cur[k] || { added: [], edited: {} };
+          if (!mine.added) mine.added = [];
+          if (!imp.added) imp.added = [];
+          imp.added.forEach(function (it) {
+            if (!mine.added.some(function (x) { return x.id === it.id; })) mine.added.push(it);
+          });
+          mine.edited = Object.assign({}, imp.edited || {}, mine.edited || {});
+          cur[k] = mine;
+        });
+        cur._sync = { at: Date.now(), dev: 'import' };
+        localStorage.setItem('jl_user_v1', JSON.stringify(cur));
+        JL.sync.push();
+        JL.toast('Backup imported!');
+        renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList();
+      } catch (e) { JL.toast('Could not read that file — is it a valid backup?'); }
+    };
+    reader.readAsText(f);
+    this.value = '';
+  };
+  document.getElementById('d-restore').onclick = function () {
+    var u = JSON.parse(localStorage.getItem('jl_user_v1') || '{}');
+    var n = 0;
+    ['kanji', 'vocab', 'grammar', 'tests'].forEach(function (k) { if (u[k] && u[k].deleted) { n += Object.keys(u[k].deleted).length; u[k].deleted = {}; } });
+    u._sync = { at: Date.now(), dev: 'restore' };
+    localStorage.setItem('jl_user_v1', JSON.stringify(u));
+    JL.sync.push();
+    JL.toast('Restored ' + n + ' items.');
+    renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList();
+  };
+  document.getElementById('d-reset').onclick = function () {
+    if (confirm('This deletes ALL your additions, edits, custom tests and file list on ALL your synced devices. The original book data stays. Continue?')) {
+      localStorage.removeItem('jl_user_v1');
+      localStorage.setItem('jl_user_v1', JSON.stringify({ _sync: { at: Date.now(), dev: 'reset' } }));
+      JL.sync.push();
+      JL.toast('All your changes were reset.');
+      editV = editG = editK = null;
+      renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList();
+    }
+  };
+
+  document.getElementById('k-list-search').oninput = renderKanjiList;
+
+  renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList(); renderStats();
+  handleEditDeepLink();
+})();
+</script>
+</body>
+</html>

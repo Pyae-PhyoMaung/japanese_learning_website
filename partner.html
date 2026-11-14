@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Study Partner | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">Study Partner</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">🤝 Study Partner</h1>
+  <p class="subtitle">Your on-site study companion — ask about words, kanji and grammar, take quick quizzes, or get random words to learn. It answers from your books and your own edits.</p>
+
+  <div class="g-card" id="chat" style="max-height:62vh;overflow-y:auto"></div>
+  <div class="toolbar" style="margin-top:12px">
+    <input id="p-in" placeholder="e.g. meaning of 食べる · kanji 雨 · grammar てください · quiz me on vocab · random word · my files · help" style="flex:1">
+    <button class="btn primary" id="p-send">Send</button>
+  </div>
+  <p class="muted small">To add, edit or delete kanji, vocabulary, grammar or tests, go to <a href="edit.html">Add / Edit</a> — or just type “edit vocab”.</p>
+
+  <footer class="page-foot">The partner answers from your local study data (works offline). A full cloud-AI tutor over your PDFs would need a Genie space with the content in Unity Catalog.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var chat = document.getElementById('chat');
+  var FICONS = { pdf: '📚', image: '🖼️', video: '🎬', audio: '🎵', doc: '📄', other: '📦' };
+
+  function bubble(who, html) {
+    var d = document.createElement('div');
+    d.className = 'msg msg-' + who;
+    d.innerHTML = html;
+    chat.appendChild(d);
+    bindSay(d);
+    chat.scrollTop = chat.scrollHeight;
+    return d;
+  }
+  function bindSay(el) {
+    Array.prototype.forEach.call(el.querySelectorAll('[data-say]'), function (b) {
+      b.onclick = function () { JL.speak(b.dataset.say); };
+    });
+  }
+  function reply(html) { setTimeout(function () { bubble('bot', html); }, 300); }
+
+  function vocabCard(v) {
+    return '<div class="jp"><b>' + JL.esc(v.jp) + '</b> (' + JL.esc(v.rd || '') + ')</div>' +
+      '🇬🇧 ' + JL.esc(v.en || '—') + '<br>🇲🇲 ' + JL.esc(v.mm || '—') +
+      ' <button class="btn small ghost" data-say="' + JL.esc(v.jp) + '">🔊</button>';
+  }
+
+  function answer(raw) {
+    var q = raw.trim();
+    var ql = q.toLowerCase();
+    function after(html) { reply(html); }
+
+    if (ql === 'help' || ql === 'what can you do') {
+      after('I can:<br>• Look up words — “meaning of 食べる” or “tabemono”<br>• Show a kanji — “kanji 雨”<br>• Find grammar — “grammar てください”<br>• Quiz you — “quiz me on kanji / vocab / grammar”<br>• Random study items — “random word” / “random kanji”<br>• Counts — “how many kanji”<br>• List your uploaded files — “my files”<br>For adding, editing or deleting content, open the <a href="edit.html">Add / Edit</a> page.');
+      return;
+    }
+    if (ql.indexOf('how many') >= 0) {
+      after('You have <b>' + JL.data('kanji').length + '</b> kanji, <b>' + JL.data('vocab').length + '</b> vocabulary words, <b>' + JL.data('grammar').length + '</b> grammar points and <b>' + JL.data('sentences').length + '</b> listening sentences.');
+      return;
+    }
+    if (ql.indexOf('random kanji') >= 0) {
+      var k = JL.pickN(JL.data('kanji'), 1)[0];
+      after('<div class="jp" style="font-size:2.2rem"><b>' + k.kanji + '</b></div>' +
+        JL.esc((k.on || []).join('、') + ' / ' + (k.kun || '')) + '<br>🇬🇧 ' + JL.esc(k.en || '') + '<br>🇲🇲 ' + JL.esc(k.meaning || '') +
+        ' <button class="btn small ghost" data-say="' + JL.esc(k.kanji) + '">🔊</button>');
+      return;
+    }
+    if (ql.indexOf('random word') >= 0 || ql.indexOf('random vocab') >= 0) {
+      var v = JL.pickN(JL.data('vocab'), 1)[0];
+      after(vocabCard(v));
+      return;
+    }
+    if (ql.indexOf('quiz me') >= 0 || ql.indexOf('test me') >= 0) {
+      var kind = ql.indexOf('kanji') >= 0 ? 'kanji' : (ql.indexOf('grammar') >= 0 ? 'grammar' : 'vocab');
+      var items = [];
+      if (kind === 'kanji') {
+        var pool = JL.pickN(JL.data('kanji'), 5);
+        items = pool.map(function (kk) {
+          var wrongs = JL.pickN(JL.data('kanji').filter(function (x) { return x.kanji !== kk.kanji; }), 3);
+          var opts = JL.shuffle([kk.kanji].concat(wrongs.map(function (w) { return w.kanji; })));
+          return { q: 'Which kanji means “' + JL.esc(kk.en || kk.meaning || '') + '”?', opts: opts, ans: opts.indexOf(kk.kanji), say: kk.kanji };
+        });
+      } else if (kind === 'grammar') {
+        JL.data('grammar').forEach(function (g) {
+          (g.ex || []).forEach(function (e) { items.push({ q: e.q || e.s, opts: e.opts, ans: e.ans, note: JL.esc(g.title) }); });
+        });
+        items = JL.pickN(items, 5);
+      } else {
+        var vpool = JL.pickN(JL.data('vocab'), 5);
+        items = vpool.map(function (vv) {
+          var wrongs = JL.pickN(JL.data('vocab').filter(function (x) { return x.jp !== vv.jp; }), 3);
+          var opts = JL.shuffle([vv.jp].concat(wrongs.map(function (w) { return w.jp; })));
+          return { q: 'Which word means “' + JL.esc(vv.en || vv.mm || '') + '”?', opts: opts, ans: opts.indexOf(vv.jp), say: vv.jp };
+        });
+      }
+      if (!items.length) { after('No exercises found for that.'); return; }
+      setTimeout(function () {
+        var holder = bubble('bot', 'Here is a 5-question quiz on ' + kind + '! <div id="pq"></div>');
+        JL.quiz(holder.querySelector('#pq'), items, { title: 'Partner quiz — ' + kind });
+        chat.scrollTop = chat.scrollHeight;
+      }, 300);
+      return;
+    }
+    if (/^(edit|add|delete|remove|create|update)/.test(ql)) {
+      after('All editing happens in the <a href="edit.html">Add / Edit</a> page — add and edit vocabulary, kanji and grammar, or build and edit your own quizzes and flashcard decks there.');
+      return;
+    }
+    if (ql.indexOf('my files') >= 0 || ql.indexOf('uploaded') >= 0) {
+      JL.files.list().then(function (rows) {
+        if (!rows.length) {
+          after('You have no uploaded files yet. Go to the <a href="files.html">Files</a> page to upload PDFs, images, videos and audio.');
+          return;
+        }
+        after('Your uploaded files (' + rows.length + '):<br>' +
+          rows.slice(0, 12).map(function (r) {
+            return '• ' + (FICONS[r.cat] || '📦') + ' ' + JL.esc(r.name);
+          }).join('<br>') +
+          (rows.length > 12 ? '<br>… and ' + (rows.length - 12) + ' more' : '') +
+          '<br><a href="files.html">Manage files →</a> · <a href="textbook.html">Read uploaded PDFs in the Textbook →</a>');
+      });
+      return;
+    }
+
+    /* lookups */
+    var m = q.match(/(?:meaning of|what does|define)\s*(.+?)(?:\s+mean)?\s*\??$/i);
+    var term = (m ? m[1] : q).trim();
+    var tl = term.toLowerCase();
+
+    var kanji = JL.data('kanji').filter(function (k) {
+      return k.kanji === term || (k.on || []).indexOf(term) >= 0 || (k.kun || '') === term || term.indexOf(k.kanji) >= 0;
+    }).slice(0, 3);
+    if (term.length <= 2 && kanji.length) {
+      after(kanji.map(function (k) {
+        return 'Kanji <b class="jp" style="font-size:1.6rem">' + k.kanji + '</b>: ' + JL.esc((k.on || []).join('、')) + ' / ' + JL.esc(k.kun || '') +
+          '<br>🇬🇧 ' + JL.esc(k.en || '') + ' · 🇲🇲 ' + JL.esc(k.meaning || '') +
+          ' <button class="btn small ghost" data-say="' + JL.esc(k.kanji) + '">🔊</button>' +
+          ' <a class="btn small" href="kanji-draw.html?k=' + encodeURIComponent(k.kanji) + '">✍️ Write it</a>';
+      }).join('<hr>'));
+      return;
+    }
+    var vocab = JL.data('vocab').filter(function (v2) {
+      return [v2.jp, v2.rd, v2.romaji, v2.en, v2.mm].join(' ').toLowerCase().indexOf(tl) >= 0;
+    }).slice(0, 4);
+    if (vocab.length) { after(vocab.map(vocabCard).join('<hr>')); return; }
+    var gram = JL.data('grammar').filter(function (g) {
+      var hay = (g.title + ' ' + (g.explain || '') + ' ' + (g.ex || []).map(function (e) { return (e.q || '') + (e.opts || []).join(''); }).join(' ')).toLowerCase();
+      return hay.indexOf(tl) >= 0;
+    }).slice(0, 3);
+    if (gram.length) {
+      after(gram.map(function (g) {
+        return 'Grammar <b class="jp">' + JL.esc(g.title) + '</b>: ' + JL.esc(String(g.explain || '').slice(0, 180)) +
+          ' <a class="btn small" href="grammar.html">Open grammar →</a>';
+      }).join('<hr>'));
+      return;
+    }
+    after('Hmm, I couldn’t find that. Try “help”, search a word like “meaning of 食べる”, or say “quiz me on vocab”.');
+  }
+
+  function send() {
+    var inp = document.getElementById('p-in');
+    var q = inp.value.trim();
+    if (!q) return;
+    inp.value = '';
+    bubble('user', JL.esc(q));
+    answer(q);
+  }
+  document.getElementById('p-send').onclick = send;
+  document.getElementById('p-in').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') send();
+  });
+
+  bubble('bot', 'こんにちは！I’m your study partner. Try: <b>meaning of 食べる</b>, <b>kanji 雨</b>, <b>grammar てください</b>, <b>quiz me on kanji</b>, <b>random word</b>, <b>my files</b>, or <b>help</b>.');
+})();
+</script>
+</body>
+</html>

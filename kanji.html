@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kanji | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">漢字</span><span class="brand-title">Kanji Learning &amp; Practice</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">漢 Kanji Learning &amp; Practice</h1>
+  <p class="subtitle">All N5 kanji from your Kanji Master book — with readings, meanings, example words and audio. Click any kanji for details, or switch to Flashcards / Quiz to practice.</p>
+
+  <div id="tts-banner"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="learn">Learn</button>
+    <button class="tab" data-tab="cards">Flashcards</button>
+    <button class="tab" data-tab="quiz">Quiz</button>
+  </div>
+
+  <div id="panel-learn" class="tab-panel active">
+    <div class="chips" id="chapter-chips"></div>
+    <div class="toolbar">
+      <input type="search" id="k-search" placeholder="Search kanji, readings or meanings…" style="flex:1;min-width:220px">
+      <span class="muted small" id="k-count"></span>
+    </div>
+    <div class="kanji-grid" id="k-grid"></div>
+  </div>
+
+  <div id="panel-cards" class="tab-panel">
+    <div class="chips" id="chapter-chips2"></div>
+    <button class="btn primary" id="cards-start">Start flashcards</button>
+    <div id="cards-area" style="margin-top:16px"></div>
+  </div>
+
+  <div id="panel-quiz" class="tab-panel">
+    <div class="chips" id="chapter-chips3"></div>
+    <div class="toolbar">
+      <select id="quiz-mode">
+        <option value="reading">Kanji → reading (choose the correct reading)</option>
+        <option value="meaning">Kanji → meaning (choose the correct meaning)</option>
+        <option value="char">Reading → kanji (choose the correct kanji)</option>
+      </select>
+      <button class="btn primary" id="quiz-start">Start quiz (10 questions)</button>
+    </div>
+    <div id="quiz-area" style="margin-top:16px"></div>
+  </div>
+
+  <!-- detail modal -->
+  <div class="modal hidden" id="k-modal">
+    <div class="modal-box">
+      <button class="modal-close" id="k-modal-close">✕</button>
+      <div id="k-modal-body"></div>
+    </div>
+  </div>
+
+  <footer class="page-foot">✍️ Want to practice writing? Open the <a href="kanji-draw.html">Kanji writing practice</a> page.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var ALL = JL.data('kanji');
+  JL.ttsBanner('tts-banner');
+  var chapters = [];
+  ALL.forEach(function (k) {
+    if (!chapters.some(function (c) { return c.n === k.chapter; })) chapters.push({ n: k.chapter, t: k.chapterTitle });
+  });
+  chapters.sort(function (a, b) { return a.n - b.n; });
+
+  var state = { chapter: 0, q: '' };
+
+  function chipHtml(n, label) {
+    return '<button class="chip' + (state.chapter === n ? ' active' : '') + '" data-n="' + n + '">' + label + '</button>';
+  }
+  function renderChips(elId) {
+    var el = document.getElementById(elId);
+    el.innerHTML = chipHtml(0, 'All (' + ALL.length + ')') +
+      chapters.map(function (c) {
+        var cnt = ALL.filter(function (k) { return k.chapter === c.n; }).length;
+        return chipHtml(c.n, (c.n || '?') + '章 ' + JL.esc(c.t) + ' (' + cnt + ')');
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { state.chapter = parseInt(b.dataset.n, 10); renderChips('chapter-chips'); renderChips('chapter-chips2'); renderChips('chapter-chips3'); renderGrid(); };
+    });
+  }
+
+  function filtered() {
+    return ALL.filter(function (k) {
+      if (state.chapter && k.chapter !== state.chapter) return false;
+      if (state.q) {
+        var q = state.q.toLowerCase();
+        var hay = [k.kanji, (k.on || []).join(' '), k.kun, k.meaning, k.en].join(' ').toLowerCase();
+        var inExamples = (k.examples || []).some(function (e) { return (e.word + ' ' + e.reading + ' ' + e.meaning).toLowerCase().indexOf(q) >= 0; });
+        if (hay.indexOf(q) < 0 && !inExamples) return false;
+      }
+      return true;
+    });
+  }
+
+  function kReading(k) { return (k.kun || (k.on || [])[0] || ''); }
+
+  function renderGrid() {
+    var list = filtered();
+    document.getElementById('k-count').textContent = list.length + ' kanji';
+    document.getElementById('k-grid').innerHTML = list.map(function (k) {
+      return '<div class="kanji-card" data-id="' + k.id + '">' +
+        '<span class="kchar jp">' + JL.esc(k.kanji) + '</span>' +
+        '<span class="krd jp">' + JL.esc(kReading(k)) + '</span>' +
+        '<span class="kmn">' + JL.esc(k.en || k.meaning || '') + '</span></div>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#k-grid .kanji-card'), function (c) {
+      c.onclick = function () {
+        var k = ALL.find(function (x) { return x.id === c.dataset.id; });
+        openDetail(k);
+      };
+    });
+  }
+
+  function openDetail(k) {
+    if (!k) return;
+    var ex = (k.examples || []).map(function (e) {
+      return '<div class="example"><button class="speak" data-say="' + JL.esc(e.word) + '">🔊</button>' +
+        '<div><div class="ex-j jp">' + JL.esc(e.word) + ' <span class="ex-r">' + JL.esc(e.reading) + '</span></div>' +
+        '<div class="ex-e">' + JL.esc(e.meaning) + '</div></div></div>';
+    }).join('');
+    document.getElementById('k-modal-body').innerHTML =
+      '<h2 class="jp" style="font-size:2.6rem;text-align:center">' + JL.esc(k.kanji) + '</h2>' +
+      '<p style="text-align:center">' +
+      '<span class="pattern">音 ' + JL.esc((k.on || []).join(' · ')) + '</span> ' +
+      '<span class="pattern" style="background:var(--accent)">訓 ' + JL.esc(k.kun || '—') + '</span></p>' +
+      '<p style="text-align:center"><b>' + JL.esc(k.en) + '</b>' + (k.meaning ? ' · <span class="jp">' + JL.esc(k.meaning) + '</span>' : '') + '</p>' +
+      '<div style="text-align:center;margin:6px 0 10px">' +
+      '<button class="btn" data-say="' + JL.esc(k.kanji) + '">🔊 Listen to the kanji</button> ' +
+      '<a class="btn primary" href="kanji-draw.html?k=' + encodeURIComponent(k.kanji) + '">✍️ Practice writing</a></div>' +
+      (ex ? '<h4>Example words</h4>' + ex : '');
+    Array.prototype.forEach.call(document.querySelectorAll('#k-modal-body [data-say]'), function (b) {
+      b.onclick = function () { JL.speak(b.dataset.say); };
+    });
+    document.getElementById('k-modal').classList.remove('hidden');
+  }
+  document.getElementById('k-modal-close').onclick = function () { document.getElementById('k-modal').classList.add('hidden'); };
+  document.getElementById('k-modal').onclick = function (e) {
+    if (e.target === document.getElementById('k-modal')) document.getElementById('k-modal').classList.add('hidden');
+  };
+
+  document.getElementById('k-search').oninput = function () { state.q = this.value.trim(); renderGrid(); };
+
+  /* tabs */
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.onclick = function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    };
+  });
+
+  /* flashcards */
+  document.getElementById('cards-start').onclick = function () {
+    var list = filtered();
+    if (!list.length) { JL.toast('No kanji match the current filter.'); return; }
+    JL.flashcards(document.getElementById('cards-area'), list.map(function (k) {
+      return {
+        front: JL.esc(k.kanji),
+        back: '<div><b>' + JL.esc(kReading(k)) + '</b><br><span class="small">' + JL.esc(k.en || '') + '</span>' +
+          (k.meaning ? '<br><span class="jp small muted">' + JL.esc(k.meaning) + '</span>' : '') + '</div>',
+        say: k.kanji
+      };
+    }), { title: 'Kanji flashcards' });
+  };
+
+  /* quiz */
+  function buildQuiz() {
+    var mode = document.getElementById('quiz-mode').value;
+    var pool = filtered();
+    if (pool.length < 4) { JL.toast('Need at least 4 kanji in the current filter.'); return null; }
+    var qs = JL.pickN(pool, Math.min(10, pool.length)).map(function (k) {
+      var others = JL.pickN(pool.filter(function (o) { return o.id !== k.id; }), 3);
+      if (mode === 'reading') {
+        var answer = kReading(k);
+        var opts = JL.shuffle([answer].concat(others.map(function (o) { return kReading(o) || o.kanji; })));
+        return { q: k.kanji, opts: opts, ans: opts.indexOf(answer), say: k.kanji, note: JL.esc(k.en || '') };
+      } else if (mode === 'meaning') {
+        var a2 = k.en || k.meaning;
+        var o2 = JL.shuffle([a2].concat(others.map(function (o) { return o.en || o.meaning; })));
+        return { q: k.kanji, opts: o2, ans: o2.indexOf(a2), say: k.kanji, note: '<span class="jp">' + JL.esc(kReading(k)) + '</span>' };
+      } else {
+        var o3 = JL.shuffle([k.kanji].concat(others.map(function (o) { return o.kanji; })));
+        return { q: kReading(k) + ' — which kanji is this?', opts: o3, ans: o3.indexOf(k.kanji), say: kReading(k), note: JL.esc(k.en || '') };
+      }
+    });
+    return qs;
+  }
+  document.getElementById('quiz-start').onclick = function () {
+    var qs = buildQuiz();
+    if (qs) JL.quiz(document.getElementById('quiz-area'), qs, { title: 'Kanji quiz' });
+  };
+
+  renderChips('chapter-chips'); renderChips('chapter-chips2'); renderChips('chapter-chips3');
+  renderGrid();
+})();
+</script>
+</body>
+</html>

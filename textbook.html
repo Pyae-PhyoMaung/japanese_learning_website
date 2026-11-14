@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Textbook | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">Textbook Reading</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">📖 Textbook Reader</h1>
+  <p class="subtitle">Read the complete books, page by page. Your last page is remembered for each book.</p>
+
+  <div class="toolbar">
+    <select id="book-select"></select>
+    <button class="btn" id="pg-first">⏮ First</button>
+    <button class="btn" id="pg-prev">← Prev</button>
+    <span>Page <input type="number" id="pg-num" min="1" style="width:70px"> / <span id="pg-total">?</span></span>
+    <button class="btn" id="pg-next">Next →</button>
+    <button class="btn" id="pg-last">Last ⏭</button>
+    <button class="btn" id="zoom-out">➖</button>
+    <button class="btn" id="zoom-in">➕</button>
+    <button class="btn" id="mode-toggle">📜 Continuous view</button>
+    <a class="btn ghost" id="download-book" download>⬇ Download book</a>
+  </div>
+
+  <div class="notice" id="pdf-status">Loading PDF engine…</div>
+
+  <div class="pdf-canvas-wrap" id="pdf-page-wrap"><canvas id="pdf-canvas"></canvas></div>
+  <div class="pdf-canvas-wrap" id="pdf-scroll" style="display:none"></div>
+
+  <footer class="page-foot">The reader loads PDF.js from a CDN, so an internet connection is required the first time. Books are stored locally in the <code>assets/pdfs</code> folder.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var BOOKS = [
+    { id: 'minna', title: 'Minna no Nihongo N5 (Myanmar translation)', file: 'assets/pdfs/Minna-no-Nihongo-N5-Myanmar.pdf' },
+    { id: 'kanji', title: 'N5 Kanji Master (Myanmar meanings)', file: 'assets/pdfs/N5-Kanji-Master.pdf' }
+  ];
+  var pdfDoc = null, pageNum = 1, scale = 1.4, currentBook = BOOKS[0], rendering = false, pending = null;
+  var mode = 'page', scrollZoom = 1;
+  var scrollBuilt = false, scrollRendered = {}, scrollSlots = {}, scrollObserver = null;
+
+  var sel = document.getElementById('book-select');
+  BOOKS.forEach(function (b, i) {
+    var o = document.createElement('option');
+    o.value = i; o.textContent = b.title;
+    sel.appendChild(o);
+  });
+  sel.onchange = function () { currentBook = BOOKS[sel.value]; loadBook(); };
+  /* uploaded PDFs from the Files page also appear here */
+  JL.files.list().then(function (rows) {
+    rows.filter(function (r) { return r.cat === 'pdf'; }).forEach(function (r) {
+      BOOKS.push({ id: 'up_' + r.id, title: r.name.replace(/\.pdf$/i, ''), file: 'idb:' + r.id });
+      var o = document.createElement('option');
+      o.value = BOOKS.length - 1;
+      o.textContent = '📄 ' + r.name;
+      sel.appendChild(o);
+    });
+  });
+
+  function status(msg) { document.getElementById('pdf-status').textContent = msg; }
+
+  function openDoc(b) {
+    if (String(b.file).slice(0, 4) === 'idb:') {
+      return JL.files.get(b.file.slice(4)).then(function (rec) {
+        if (!rec) throw new Error('This uploaded file was removed from the Files page');
+        return rec.blob.arrayBuffer().then(function (ab) { return pdfjsLib.getDocument({ data: ab }).promise; });
+      });
+    }
+    return pdfjsLib.getDocument({ url: b.file }).promise;
+  }
+
+  function loadBook() {
+    if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    status('Loading “' + currentBook.title + '”…');
+    openDoc(currentBook).then(function (d) {
+      pdfDoc = d;
+      document.getElementById('pg-total').textContent = d.numPages;
+      var saved = parseInt(JL.pref('book_page_' + currentBook.id) || '0', 10);
+      pageNum = (saved > 0 && saved <= d.numPages) ? saved : 1;
+      document.getElementById('download-book').href = currentBook.file;
+      document.getElementById('download-book').setAttribute('download', currentBook.file.split('/').pop());
+      scrollBuilt = false;
+      if (mode === 'scroll') { ensureScroll(); } else { render(); }
+    }).catch(function (err) {
+      status('Could not load the PDF: ' + (err && err.message ? err.message : err) +
+        ' — make sure the assets/pdfs folder travels together with the HTML files, and that the page is served (or opened locally) from the Website folder.');
+    });
+  }
+
+  function render() {
+    if (rendering) { pending = true; return; }
+    rendering = true;
+    pdfDoc.getPage(pageNum).then(function (page) {
+      var canvas = document.getElementById('pdf-canvas');
+      var viewport = page.getViewport({ scale: scale });
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(viewport.width * dpr);
+      canvas.height = Math.floor(viewport.height * dpr);
+      canvas.style.width = Math.floor(viewport.width) + 'px';
+      canvas.style.height = Math.floor(viewport.height) + 'px';
+      var ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function () {
+        rendering = false;
+        status('“' + currentBook.title + '” — page ' + pageNum + ' of ' + pdfDoc.numPages);
+        document.getElementById('pg-num').value = pageNum;
+        JL.pref('book_page_' + currentBook.id, pageNum);
+        if (pending) { pending = false; render(); }
+      });
+    });
+  }
+
+  /* ---------- continuous scroll mode ---------- */
+  function updateModeUI() {
+    document.getElementById('pdf-page-wrap').style.display = mode === 'page' ? '' : 'none';
+    document.getElementById('pdf-scroll').style.display = mode === 'scroll' ? '' : 'none';
+    document.getElementById('mode-toggle').textContent = mode === 'page' ? '📜 Continuous view' : '📄 Page-by-page view';
+  }
+  function ensureScroll() {
+    if (!pdfDoc) return;
+    var wrap = document.getElementById('pdf-scroll');
+    if (scrollObserver) { try { scrollObserver.disconnect(); } catch (e) {} }
+    wrap.innerHTML = '';
+    scrollRendered = {}; scrollSlots = {};
+    for (var n = 1; n <= pdfDoc.numPages; n++) {
+      var slot = document.createElement('div');
+      slot.dataset.page = String(n);
+      slot.style.margin = '0 auto 18px';
+      slot.style.width = '100%';
+      var c = document.createElement('canvas');
+      c.style.width = '100%';
+      c.style.display = 'block';
+      c.style.background = '#fff';
+      c.style.borderRadius = '4px';
+      c.style.minHeight = '400px';
+      var lab = document.createElement('div');
+      lab.textContent = n + ' / ' + pdfDoc.numPages;
+      lab.style.textAlign = 'center';
+      lab.style.color = '#cfd3d6';
+      lab.style.fontSize = '12px';
+      slot.appendChild(c);
+      slot.appendChild(lab);
+      wrap.appendChild(slot);
+      scrollSlots[n] = slot;
+    }
+    scrollObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        var n = parseInt(en.target.dataset.page, 10);
+        if (en.isIntersecting) {
+          renderSlot(n);
+          if (en.intersectionRatio > 0.25) {
+            pageNum = n;
+            document.getElementById('pg-num').value = n;
+            JL.pref('book_page_' + currentBook.id, n);
+            status('“' + currentBook.title + '” — continuous view, around page ' + n + ' of ' + pdfDoc.numPages);
+          }
+        } else if (en.boundingClientRect.bottom < -1600 || en.boundingClientRect.top > window.innerHeight + 1600) {
+          unrenderSlot(n);
+        }
+      });
+    }, { rootMargin: '1200px 0px' });
+    Object.keys(scrollSlots).forEach(function (k) { scrollObserver.observe(scrollSlots[k]); });
+    scrollBuilt = true;
+    var target = scrollSlots[pageNum];
+    if (target && pageNum > 1) target.scrollIntoView({ block: 'start' });
+    status('“' + currentBook.title + '” — continuous view. Scroll to read the whole book.');
+  }
+  function renderSlot(n) {
+    if (!pdfDoc || scrollRendered[n]) return;
+    scrollRendered[n] = true;
+    pdfDoc.getPage(n).then(function (page) {
+      var slot = scrollSlots[n];
+      if (!slot) return;
+      var c = slot.querySelector('canvas');
+      var avail = Math.max(320, (document.getElementById('pdf-scroll').clientWidth || 800) - 8);
+      var base = page.getViewport({ scale: 1 });
+      var fit = Math.max(0.2, (avail / base.width) * scrollZoom);
+      var vp = page.getViewport({ scale: fit });
+      var dpr = 1;
+      c.width = Math.floor(vp.width * dpr);
+      c.height = Math.floor(vp.height * dpr);
+      c.style.minHeight = '';
+      c.style.height = 'auto';
+      slot.dataset.h = String(Math.floor(vp.height));
+      page.render({ canvasContext: c.getContext('2d'), viewport: vp });
+    });
+  }
+  function unrenderSlot(n) {
+    var slot = scrollSlots[n];
+    if (!slot || !scrollRendered[n]) return;
+    var c = slot.querySelector('canvas');
+    if (c && c.width > 1) {
+      c.style.height = (slot.dataset.h || '800') + 'px';
+      c.width = 1; c.height = 1;
+    }
+    scrollRendered[n] = false;
+  }
+  function zoomBy(d) {
+    scale = Math.min(3, Math.max(0.6, scale + d));
+    if (mode === 'scroll') {
+      scrollZoom = Math.min(2.5, Math.max(0.5, scrollZoom * (1 + d)));
+      Object.keys(scrollRendered).forEach(function (k) {
+        var n = parseInt(k, 10);
+        scrollRendered[n] = false;
+        renderSlot(n);
+      });
+    } else {
+      render();
+    }
+  }
+
+  function goTo(n) {
+    if (!pdfDoc) return;
+    n = Math.min(Math.max(1, n), pdfDoc.numPages);
+    pageNum = n;
+    if (mode === 'scroll') {
+      var slot = scrollSlots[n];
+      if (slot) { renderSlot(n); slot.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      document.getElementById('pg-num').value = n;
+      JL.pref('book_page_' + currentBook.id, n);
+    } else {
+      render();
+    }
+  }
+
+  document.getElementById('pg-first').onclick = function () { goTo(1); };
+  document.getElementById('pg-prev').onclick = function () { goTo(pageNum - 1); };
+  document.getElementById('pg-next').onclick = function () { goTo(pageNum + 1); };
+  document.getElementById('pg-last').onclick = function () { if (pdfDoc) goTo(pdfDoc.numPages); };
+  document.getElementById('zoom-in').onclick = function () { zoomBy(0.2); };
+  document.getElementById('zoom-out').onclick = function () { zoomBy(-0.2); };
+  document.getElementById('mode-toggle').onclick = function () {
+    mode = mode === 'page' ? 'scroll' : 'page';
+    updateModeUI();
+    if (mode === 'scroll') { ensureScroll(); } else { render(); }
+  };
+  document.getElementById('pg-num').onchange = function () { goTo(parseInt(this.value, 10) || 1); };
+
+  var rsT = null;
+  window.addEventListener('resize', function () {
+    if (mode !== 'scroll') return;
+    clearTimeout(rsT);
+    rsT = setTimeout(function () {
+      Object.keys(scrollRendered).forEach(function (k) {
+        var n = parseInt(k, 10);
+        scrollRendered[n] = false;
+        renderSlot(n);
+      });
+    }, 300);
+  });
+
+  updateModeUI();
+  loadBook();
+})();
+</script>
+</body>
+</html>

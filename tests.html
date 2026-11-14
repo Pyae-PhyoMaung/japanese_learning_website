@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tests | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">試験</span><span class="brand-title">Practice Tests</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">📝 Practice Tests</h1>
+  <p class="subtitle">Practice with flashcards and auto-generated quizzes from your study data, or take the custom tests and flashcard decks you build yourself.</p>
+
+  <div id="tts-banner"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="cards">Flashcards</button>
+    <button class="tab" data-tab="quiz">Quizzes</button>
+    <button class="tab" data-tab="mine">My tests</button>
+  </div>
+
+  <div id="panel-cards" class="tab-panel active">
+    <div class="toolbar">
+      <select id="deck-src">
+        <option value="kanji">Kanji (kanji → reading &amp; meaning)</option>
+        <option value="vocab">Vocabulary (Japanese ⇄ meaning)</option>
+        <option value="grammar">Grammar example sentences</option>
+        <option value="sentences">All sentences</option>
+      </select>
+      <button class="btn primary" id="deck-start">Start flashcards</button>
+    </div>
+    <div id="deck-area" style="margin-top:16px"></div>
+  </div>
+
+  <div id="panel-quiz" class="tab-panel">
+    <div class="toolbar">
+      <select id="quiz-src">
+        <option value="kanji-r">Kanji → reading</option>
+        <option value="kanji-m">Kanji → meaning</option>
+        <option value="vocab-jm">Vocabulary: Japanese → meaning</option>
+        <option value="vocab-mj">Vocabulary: meaning → Japanese</option>
+        <option value="vocab-a">Vocabulary: 🎧 listen and choose</option>
+        <option value="grammar">Grammar exercises (mixed)</option>
+      </select>
+      <button class="btn primary" id="quiz-start">Start quiz (10 questions)</button>
+    </div>
+    <div id="quiz-area" style="margin-top:16px"></div>
+  </div>
+
+  <div id="panel-mine" class="tab-panel">
+    <p class="muted">Your own quizzes and flashcard decks. <a href="edit.html">Create a new one in Add / Edit → Tests</a>.</p>
+    <div id="mine-list"></div>
+  </div>
+
+  <footer class="page-foot">Every quiz and flashcard deck here is generated fresh from your current data — including anything you added in the editor.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  JL.ttsBanner('tts-banner');
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.onclick = function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    };
+  });
+
+  var KANJI = JL.data('kanji'), VOCAB = JL.data('vocab'), GRAM = JL.data('grammar'), SENT = JL.data('sentences');
+
+  /* ---------- flashcards ---------- */
+  document.getElementById('deck-start').onclick = function () {
+    var src = document.getElementById('deck-src').value;
+    var cards = [];
+    if (src === 'kanji') {
+      cards = KANJI.map(function (k) {
+        return { front: JL.esc(k.kanji), back: '<b>' + JL.esc(k.kun || (k.on || [])[0] || '') + '</b><br><span class="small">' + JL.esc(k.en || '') + '</span>', say: k.kanji };
+      });
+    } else if (src === 'vocab') {
+      cards = VOCAB.map(function (v) {
+        return { front: '<span class="jp" style="font-size:1.6rem">' + JL.esc(v.jp) + '</span>', back: JL.esc(v.en || v.mm || '') + '<div class="small muted">' + JL.esc(v.jp) + ' · ' + JL.esc(v.rd || '') + '</div>', say: v.jp };
+      });
+    } else if (src === 'grammar') {
+      GRAM.forEach(function (g) {
+        (g.examples || []).forEach(function (e) {
+          cards.push({ front: JL.esc(e.jp), back: JL.esc(e.en || '') + '<div class="small muted">' + JL.esc(e.rd || '') + ' · ' + JL.esc(g.title) + '</div>', say: e.jp });
+        });
+      });
+    } else {
+      cards = SENT.map(function (s) {
+        return { front: JL.esc(s.jp), back: JL.esc(s.en || '') + '<div class="small muted">' + JL.esc(s.rd || '') + '</div>', say: s.jp };
+      });
+    }
+    if (!cards.length) { JL.toast('No cards for this source yet.'); return; }
+    JL.flashcards(document.getElementById('deck-area'), cards, { title: 'Flashcards' });
+  };
+
+  /* ---------- quizzes ---------- */
+  document.getElementById('quiz-start').onclick = function () {
+    var src = document.getElementById('quiz-src').value;
+    var qs = [];
+    if (src === 'kanji-r' || src === 'kanji-m') {
+      if (KANJI.length < 4) { JL.toast('Not enough kanji.'); return; }
+      qs = JL.pickN(KANJI, 10).map(function (k) {
+        var others = JL.pickN(KANJI.filter(function (o) { return o.id !== k.id; }), 3);
+        if (src === 'kanji-r') {
+          var a = k.kun || (k.on || [])[0];
+          var o = JL.shuffle([a].concat(others.map(function (x) { return x.kun || (x.on || [])[0]; })));
+          return { q: k.kanji, opts: o, ans: o.indexOf(a), say: k.kanji };
+        }
+        var a2 = k.en || k.meaning;
+        var o2 = JL.shuffle([a2].concat(others.map(function (x) { return x.en || x.meaning; })));
+        return { q: k.kanji, opts: o2, ans: o2.indexOf(a2), say: k.kanji };
+      });
+    } else if (src === 'vocab-jm' || src === 'vocab-mj' || src === 'vocab-a') {
+      if (VOCAB.length < 4) { JL.toast('Not enough words.'); return; }
+      qs = JL.pickN(VOCAB, 10).map(function (v) {
+        var others = JL.pickN(VOCAB.filter(function (o) { return o.id !== v.id; }), 3);
+        if (src === 'vocab-jm') {
+          var a = v.en || v.mm;
+          var o = JL.shuffle([a].concat(others.map(function (x) { return x.en || x.mm; })));
+          return { q: v.jp + '  (' + (v.rd || '') + ')', opts: o, ans: o.indexOf(a), say: v.jp };
+        } else if (src === 'vocab-mj') {
+          var o2 = JL.shuffle([v.jp].concat(others.map(function (x) { return x.jp; })));
+          return { q: JL.esc(v.en || v.mm || ''), opts: o2, ans: o2.indexOf(v.jp), say: v.jp };
+        }
+        var o3 = JL.shuffle([v.jp].concat(others.map(function (x) { return x.jp; })));
+        return { q: '🎧 Listen — which word?', opts: o3, ans: o3.indexOf(v.jp), say: v.jp };
+      });
+    } else {
+      GRAM.forEach(function (g) {
+        (g.exercises || []).forEach(function (e) {
+          qs.push({ q: e.q, opts: e.opts, ans: e.ans, note: JL.esc(g.title) + ' — ✓ ' + e.opts[e.ans] });
+        });
+      });
+      qs = JL.pickN(qs, 15);
+      if (!qs.length) { JL.toast('No grammar exercises found.'); return; }
+    }
+    JL.quiz(document.getElementById('quiz-area'), qs, { title: 'Practice quiz' });
+  };
+
+  /* ---------- my tests ---------- */
+  function userTests() {
+    var u = JSON.parse(localStorage.getItem('jl_user_v1') || '{}');
+    return ((u.tests || {}).added) || [];
+  }
+  function renderMine() {
+    var list = userTests();
+    var el = document.getElementById('mine-list');
+    if (!list.length) {
+      el.innerHTML = '<div class="notice">You have no custom tests yet. Go to <a href="edit.html">Add / Edit → Tests</a> to create quizzes and flashcard decks of your own.</div>';
+      return;
+    }
+    el.innerHTML = list.map(function (t) {
+      var cnt = t.type === 'quiz' ? (t.questions || []).length + ' questions' : (t.cards || []).length + ' cards';
+      return '<div class="g-card"><h3>' + JL.esc(t.title) + ' <span class="muted small">· ' + (t.type === 'quiz' ? 'Quiz' : 'Flashcard deck') + ' · ' + cnt + '</span></h3>' +
+        '<button class="btn primary" data-take="' + t.id + '">▶ Take this test</button> ' +
+        '<a class="btn" href="edit.html?t=' + t.id + '">✏️ Edit</a> ' +
+        '<button class="btn ghost" data-del="' + t.id + '">🗑 Delete</button></div>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('[data-take]'), function (b) {
+      b.onclick = function () {
+        var t = userTests().find(function (x) { return x.id === b.dataset.take; });
+        if (!t) return;
+        if (t.type === 'quiz') {
+          var qs = (t.questions || []).map(function (q) { return { q: q.q, opts: q.opts, ans: q.ans }; });
+          JL.quiz(el, qs, { title: t.title });
+        } else {
+          var cards = (t.cards || []).map(function (c) { return { front: JL.esc(c.front), back: JL.esc(c.back) }; });
+          JL.flashcards(el, cards, { title: t.title });
+        }
+      };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-del]'), function (b) {
+      b.onclick = function () {
+        if (!confirm('Delete this test?')) return;
+        JL.remove('tests', b.dataset.del);
+        renderMine();
+      };
+    });
+  }
+  renderMine();
+})();
+</script>
+</body>
+</html>

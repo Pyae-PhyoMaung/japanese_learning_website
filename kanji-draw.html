@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Write Kanji | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">書✍</span><span class="brand-title">Kanji Writing Practice</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">✍️ Kanji Writing Practice</h1>
+  <p class="subtitle">View the kanji and write it yourself on the grid. Trace the light-gray guide character while you practice, or hide it to test yourself.</p>
+
+  <div class="draw-wrap">
+    <div class="pad-box">
+      <canvas id="guide-canvas"></canvas>
+      <canvas id="draw-canvas"></canvas>
+    </div>
+    <div class="draw-info">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span class="big-char jp" id="cur-char">一</span>
+        <div>
+          <div class="jp" id="cur-readings"></div>
+          <div class="muted" id="cur-meaning"></div>
+        </div>
+        <button class="btn" id="say-cur">🔊 Listen</button>
+      </div>
+      <div class="toolbar" style="margin-top:14px">
+        <button class="btn" id="d-prev">← Prev</button>
+        <button class="btn" id="d-next">Next →</button>
+        <button class="btn" id="d-clear">🧹 Clear</button>
+        <button class="btn" id="d-undo">↩ Undo stroke</button>
+        <button class="btn ghost" id="d-guide">👁 Hide guide</button>
+      </div>
+      <div class="chips" id="draw-chips"></div>
+      <p class="muted small" id="progress"></p>
+      <div>
+        <h4>Example words</h4>
+        <div id="cur-examples"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="page-foot">Draw with your mouse, finger or stylus. The character shown in light gray is your tracing guide.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var ALL = JL.data('kanji');
+  var idx = 0, showGuide = true;
+  var pad = JL.pad('draw-canvas', 'guide-canvas');
+
+  /* deep link ?k=漢 */
+  var m = location.search.match(/[?&]k=([^&]+)/);
+  if (m) {
+    var wanted = decodeURIComponent(m[1]);
+    var wi = ALL.findIndex(function (k) { return k.kanji === wanted; });
+    if (wi >= 0) idx = wi;
+  }
+
+  var chapters = [];
+  ALL.forEach(function (k) {
+    if (!chapters.some(function (c) { return c.n === k.chapter; })) chapters.push({ n: k.chapter, t: k.chapterTitle });
+  });
+  chapters.sort(function (a, b) { return a.n - b.n; });
+  var chapterFilter = 0;
+
+  function list() { return chapterFilter ? ALL.filter(function (k) { return k.chapter === chapterFilter; }) : ALL; }
+
+  function renderChips() {
+    var el = document.getElementById('draw-chips');
+    el.innerHTML = '<button class="chip' + (chapterFilter === 0 ? ' active' : '') + '" data-n="0">All chapters</button>' +
+      chapters.map(function (c) {
+        return '<button class="chip' + (chapterFilter === c.n ? ' active' : '') + '" data-n="' + c.n + '">' + (c.n || '?') + '章 ' + JL.esc(c.t) + '</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () {
+        chapterFilter = parseInt(b.dataset.n, 10); idx = 0; renderChips(); render();
+      };
+    });
+  }
+
+  function render() {
+    var L = list();
+    if (!L.length) { document.getElementById('cur-char').textContent = '—'; return; }
+    idx = Math.min(idx, L.length - 1);
+    var k = L[idx];
+    document.getElementById('cur-char').textContent = k.kanji;
+    document.getElementById('cur-readings').innerHTML =
+      '音 ' + JL.esc((k.on || []).join(' · ')) + ' · 訓 <b>' + JL.esc(k.kun || '—') + '</b>';
+    document.getElementById('cur-meaning').textContent = (k.en || '') + (k.meaning ? ' · ' + k.meaning : '');
+    document.getElementById('cur-examples').innerHTML = (k.examples || []).map(function (e) {
+      return '<div class="example"><button class="speak" data-say="' + JL.esc(e.word) + '">🔊</button>' +
+        '<div><span class="jp">' + JL.esc(e.word) + '</span> <span class="ex-r">' + JL.esc(e.reading) + '</span> <span class="ex-e">' + JL.esc(e.meaning) + '</span></div></div>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#cur-examples [data-say]'), function (b) {
+      b.onclick = function () { JL.speak(b.dataset.say); };
+    });
+    document.getElementById('say-cur').onclick = function () { JL.speak(k.kanji); };
+    document.getElementById('progress').textContent = 'Kanji ' + (idx + 1) + ' of ' + L.length +
+      (chapterFilter ? ' (' + chapterFilter + '章 ' + JL.esc(L[idx].chapterTitle) + ')' : '');
+    pad.setGuide(k.kanji, showGuide);
+    pad.clear();
+  }
+
+  document.getElementById('d-prev').onclick = function () { idx = (idx - 1 + list().length) % list().length; render(); };
+  document.getElementById('d-next').onclick = function () { idx = (idx + 1) % list().length; render(); };
+  document.getElementById('d-clear').onclick = function () { pad.clear(); };
+  document.getElementById('d-undo').onclick = function () { pad.undo(); };
+  document.getElementById('d-guide').onclick = function () {
+    showGuide = !showGuide;
+    this.textContent = showGuide ? '👁 Hide guide' : '👁 Show guide';
+    pad.setGuide(list()[idx] ? list()[idx].kanji : '', showGuide);
+  };
+
+  renderChips();
+  render();
+})();
+</script>
+</body>
+</html>

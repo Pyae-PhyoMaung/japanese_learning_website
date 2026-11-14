@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vocabulary | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">語彙</span><span class="brand-title">Vocabulary Learning &amp; Practice</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">語 Vocabulary Learning &amp; Practice</h1>
+  <p class="subtitle">Every word from your books — Japanese, reading, English and Burmese meanings. Tap 🔊 to hear any word, or practice with flashcards and quizzes.</p>
+
+  <div id="tts-banner"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="learn">Learn</button>
+    <button class="tab" data-tab="cards">Flashcards</button>
+    <button class="tab" data-tab="quiz">Quiz</button>
+  </div>
+
+  <div id="panel-learn" class="tab-panel active">
+    <div class="chips" id="cat-chips"></div>
+    <div class="toolbar">
+      <input type="search" id="v-search" placeholder="Search word, reading or meaning…" style="flex:1;min-width:220px">
+      <span class="muted small" id="v-count"></span>
+    </div>
+    <div class="vocab-grid" id="v-grid"></div>
+  </div>
+
+  <div id="panel-cards" class="tab-panel">
+    <div class="chips" id="cat-chips2"></div>
+    <div class="toolbar">
+      <select id="cards-front">
+        <option value="jp">Front: Japanese → back: meaning</option>
+        <option value="mean">Front: meaning → back: Japanese</option>
+      </select>
+      <button class="btn primary" id="cards-start">Start flashcards</button>
+    </div>
+    <div id="cards-area" style="margin-top:16px"></div>
+  </div>
+
+  <div id="panel-quiz" class="tab-panel">
+    <div class="chips" id="cat-chips3"></div>
+    <div class="toolbar">
+      <select id="quiz-mode">
+        <option value="jp2m">Japanese → meaning</option>
+        <option value="m2jp">Meaning → Japanese</option>
+        <option value="audio">🎧 Listen and choose the word</option>
+      </select>
+      <button class="btn primary" id="quiz-start">Start quiz (10 questions)</button>
+    </div>
+    <div id="quiz-area" style="margin-top:16px"></div>
+  </div>
+
+  <footer class="page-foot">✏️ Want to practice writing words? Open the <a href="vocab-draw.html">Vocabulary writing practice</a> page. You can add your own words in <a href="edit.html">Add / Edit</a>.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var ALL = JL.data('vocab');
+  JL.ttsBanner('tts-banner');
+  var cats = [];
+  ALL.forEach(function (v) { if (v.cat && cats.indexOf(v.cat) < 0) cats.push(v.cat); });
+
+  var state = { cat: '', q: '' };
+
+  function meaning(v) { return v.en || v.mm || ''; }
+
+  function renderChips(elId) {
+    var el = document.getElementById(elId);
+    el.innerHTML = '<button class="chip' + (state.cat === '' ? ' active' : '') + '" data-c="">All (' + ALL.length + ')</button>' +
+      cats.map(function (c) {
+        var cnt = ALL.filter(function (v) { return v.cat === c; }).length;
+        return '<button class="chip' + (state.cat === c ? ' active' : '') + '" data-c="' + JL.esc(c) + '">' + JL.esc(c) + ' (' + cnt + ')</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () {
+        state.cat = b.dataset.c;
+        renderChips('cat-chips'); renderChips('cat-chips2'); renderChips('cat-chips3'); renderGrid();
+      };
+    });
+  }
+
+  function filtered() {
+    return ALL.filter(function (v) {
+      if (state.cat && v.cat !== state.cat) return false;
+      if (state.q) {
+        var hay = [v.jp, v.rd, v.romaji, v.en, v.mm].join(' ').toLowerCase();
+        if (hay.indexOf(state.q.toLowerCase()) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function speakTarget(v) { return v.jp; }
+
+  function renderGrid() {
+    var list = filtered();
+    document.getElementById('v-count').textContent = list.length + ' words';
+    document.getElementById('v-grid').innerHTML = list.map(function (v) {
+      return '<div class="vocab-row"><button class="speak" data-say="' + JL.esc(speakTarget(v)) + '">🔊</button>' +
+        '<div><div class="vj jp">' + JL.esc(v.jp) + '</div>' +
+        '<div class="vr jp">' + JL.esc(v.rd || '') + (v.romaji ? ' · ' + JL.esc(v.romaji) : '') + '</div></div>' +
+        '<div class="vm">' + JL.esc(meaning(v)) + '</div>' +
+        '<a class="btn small ghost" href="vocab-draw.html?v=' + encodeURIComponent(v.jp) + '">✏️</a></div>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#v-grid [data-say]'), function (b) {
+      b.onclick = function () { JL.speak(b.dataset.say); };
+    });
+  }
+
+  document.getElementById('v-search').oninput = function () { state.q = this.value.trim(); renderGrid(); };
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.onclick = function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    };
+  });
+
+  /* flashcards */
+  document.getElementById('cards-start').onclick = function () {
+    var list = filtered();
+    if (!list.length) { JL.toast('No words match the current filter.'); return; }
+    var frontMode = document.getElementById('cards-front').value;
+    JL.flashcards(document.getElementById('cards-area'), list.map(function (v) {
+      var jp = '<span class="jp" style="font-size:1.6rem">' + JL.esc(v.jp) + '</span>' +
+        '<div class="small muted" style="margin-top:8px">' + JL.esc(v.rd || '') + '</div>';
+      var mn = '<div>' + JL.esc(meaning(v)) + '<div class="small muted" style="margin-top:8px">' + JL.esc(v.jp) + ' · ' + JL.esc(v.rd || '') + '</div></div>';
+      return frontMode === 'jp' ? { front: jp, back: mn, say: v.jp } : { front: mn, back: jp, say: v.jp };
+    }), { title: 'Vocabulary flashcards' });
+  };
+
+  /* quiz */
+  document.getElementById('quiz-start').onclick = function () {
+    var mode = document.getElementById('quiz-mode').value;
+    var pool = filtered();
+    if (pool.length < 4) { JL.toast('Need at least 4 words in the current filter.'); return; }
+    var qs = JL.pickN(pool, Math.min(10, pool.length)).map(function (v) {
+      var others = JL.pickN(pool.filter(function (o) { return o.id !== v.id; }), 3);
+      if (mode === 'jp2m') {
+        var a = meaning(v);
+        var o = JL.shuffle([a].concat(others.map(function (x) { return meaning(x); })));
+        return { q: v.jp + '  (' + (v.rd || '') + ')', opts: o, ans: o.indexOf(a), say: v.jp };
+      } else if (mode === 'm2jp') {
+        var o2 = JL.shuffle([v.jp].concat(others.map(function (x) { return x.jp; })));
+        return { q: JL.esc(meaning(v)), opts: o2, ans: o2.indexOf(v.jp), say: v.jp };
+      } else {
+        var o3 = JL.shuffle([v.jp].concat(others.map(function (x) { return x.jp; })));
+        return { q: '🎧 Listen — which word do you hear?', opts: o3, ans: o3.indexOf(v.jp), say: v.jp, note: '<span class="jp">' + JL.esc(v.jp) + '</span> (' + JL.esc(v.rd || '') + ') — ' + JL.esc(meaning(v)) };
+      }
+    });
+    JL.quiz(document.getElementById('quiz-area'), qs, { title: 'Vocabulary quiz' });
+  };
+
+  renderChips('cat-chips'); renderChips('cat-chips2'); renderChips('cat-chips3');
+  renderGrid();
+})();
+</script>
+</body>
+</html>

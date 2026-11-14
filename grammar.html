@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grammar | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">文法</span><span class="brand-title">Grammar Learning &amp; Exercises</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">文 Grammar Learning &amp; Exercises</h1>
+  <p class="subtitle">N5 grammar points in lesson order — each with a clear explanation, example sentences you can listen to, and interactive exercises.</p>
+
+  <div id="tts-banner"></div>
+
+  <div class="toolbar">
+    <input type="search" id="g-search" placeholder="Search grammar, e.g. てください, particle, want…" style="flex:1;min-width:220px">
+    <button class="btn primary" id="g-practice-all">📝 Practice all exercises</button>
+  </div>
+
+  <div id="g-list"></div>
+
+  <!-- exercise modal -->
+  <div class="modal hidden" id="g-modal">
+    <div class="modal-box">
+      <button class="modal-close" id="g-modal-close">✕</button>
+      <div id="g-modal-body"></div>
+    </div>
+  </div>
+
+  <div id="practice-area" style="margin-top:20px"></div>
+
+  <footer class="page-foot">Teach yourself a point, listen to its examples, then do its exercise. You can add your own grammar points in <a href="edit.html">Add / Edit</a>.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var ALL = JL.data('grammar');
+  JL.ttsBanner('tts-banner');
+  var q = '';
+
+  function render() {
+    var list = ALL.filter(function (g) {
+      if (!q) return true;
+      var hay = [g.title, g.pattern, g.meaning, g.explanation, String(g.lesson)].join(' ').toLowerCase();
+      return hay.indexOf(q.toLowerCase()) >= 0;
+    }).sort(function (a, b) { return (a.lesson || 0) - (b.lesson || 0); });
+
+    document.getElementById('g-list').innerHTML = list.map(function (g) {
+      var ex = (g.examples || []).map(function (e) {
+        return '<div class="example"><button class="speak" data-say="' + JL.esc(e.jp) + '">🔊</button>' +
+          '<div><div class="ex-j jp">' + JL.esc(e.jp) + '</div>' +
+          '<div class="ex-r jp">' + JL.esc(e.rd || '') + '</div>' +
+          '<div class="ex-e">' + JL.esc(e.en || '') + '</div></div></div>';
+      }).join('');
+      return '<div class="g-card" data-id="' + g.id + '">' +
+        '<h3>' + JL.esc(g.title) + ' <span class="muted small">· Lesson ' + (g.lesson || '–') + '</span></h3>' +
+        '<span class="pattern jp">' + JL.esc(g.pattern) + '</span>' +
+        '<div class="meaning">' + JL.esc(g.meaning) + '</div>' +
+        '<p>' + JL.esc(g.explanation || '') + '</p>' +
+        (ex ? '<div>' + ex + '</div>' : '') +
+        ((g.exercises || []).length ? '<button class="btn primary g-ex">Exercise (' + g.exercises.length + ') →</button>' : '') +
+        '</div>';
+    }).join('') || '<p class="muted">No grammar points match your search.</p>';
+
+    Array.prototype.forEach.call(document.querySelectorAll('#g-list .speak'), function (b) {
+      b.onclick = function () { JL.speak(b.dataset.say); };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.g-ex'), function (b) {
+      b.onclick = function () {
+        var card = b.closest('.g-card');
+        var g = ALL.find(function (x) { return x.id === card.dataset.id; });
+        openExercise(g);
+      };
+    });
+  }
+
+  function toQuizItems(exs) {
+    return exs.map(function (e) {
+      return { q: e.q, opts: e.opts, ans: e.ans, note: '✓ ' + e.opts[e.ans] };
+    });
+  }
+
+  function openExercise(g) {
+    if (!g || !(g.exercises || []).length) return;
+    var body = document.getElementById('g-modal-body');
+    body.innerHTML = '<h2>' + JL.esc(g.title) + ' — exercise</h2><p class="muted">Choose the correct option for each blank.</p><div id="g-ex-area"></div>';
+    document.getElementById('g-modal').classList.remove('hidden');
+    JL.quiz(body.querySelector('#g-ex-area'), toQuizItems(g.exercises), { title: g.title });
+  }
+  document.getElementById('g-modal-close').onclick = function () { document.getElementById('g-modal').classList.add('hidden'); };
+  document.getElementById('g-modal').onclick = function (e) {
+    if (e.target === document.getElementById('g-modal')) document.getElementById('g-modal').classList.add('hidden');
+  };
+
+  document.getElementById('g-search').oninput = function () { q = this.value.trim(); render(); };
+
+  document.getElementById('g-practice-all').onclick = function () {
+    var all = [];
+    ALL.forEach(function (g) { (g.exercises || []).forEach(function (e) { all.push({ q: e.q, opts: e.opts, ans: e.ans, note: '✓ ' + e.opts[e.ans] }); }); });
+    if (!all.length) { JL.toast('No exercises found.'); return; }
+    var area = document.getElementById('practice-area');
+    area.scrollIntoView({ behavior: 'smooth' });
+    JL.quiz(area, all, { title: 'Mixed grammar practice' });
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
