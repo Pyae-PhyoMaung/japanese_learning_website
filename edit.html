@@ -294,6 +294,10 @@
     document.getElementById('g-form-title').textContent = '➕ Add grammar point';
     document.getElementById('gr-title').value = ''; document.getElementById('gr-pattern').value = '';
     document.getElementById('gr-meaning').value = ''; document.getElementById('gr-expl').value = '';
+    document.getElementById('gr-examples').innerHTML = '';
+    document.getElementById('gr-exercises').innerHTML = '';
+    rowsHtml(document.getElementById('gr-examples'), EXF);
+    rowsHtml(document.getElementById('gr-exercises'), QF);
   };
 
   /* ============ KANJI ============ */
@@ -324,6 +328,9 @@
     document.getElementById('k-kanji').value = ''; document.getElementById('k-on').value = '';
     document.getElementById('k-kun').value = ''; document.getElementById('k-mm').value = '';
     document.getElementById('k-en').value = '';
+    var kex = document.getElementById('k-examples');
+    kex.innerHTML = '';
+    rowsHtml(kex, KF);
     document.getElementById('k-form-title').textContent = '➕ Add kanji';
   };
   function renderKanjiList() {
@@ -350,6 +357,14 @@
         document.getElementById('k-mm').value = k.meaning || '';
         document.getElementById('k-en').value = k.en || '';
         document.getElementById('k-chapter').value = k.chapter || 1;
+        var kex = document.getElementById('k-examples');
+        kex.innerHTML = '';
+        (k.examples || []).forEach(function (e) {
+          rowsHtml(kex, KF);
+          var ins = kex.lastChild.querySelectorAll('input');
+          ins[0].value = e.word || ''; ins[1].value = e.reading || ''; ins[2].value = e.meaning || '';
+        });
+        if (!kex.children.length) rowsHtml(kex, KF);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
     });
