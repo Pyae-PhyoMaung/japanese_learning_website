@@ -369,6 +369,7 @@ window.JL = (function () {
       el.querySelector('.flashcard').onclick = function () { shown = !shown; render(); };
       el.querySelector('.fc-prev').onclick = function () { i = (i - 1 + deck.length) % deck.length; shown = false; render(); };
       el.querySelector('.fc-next').onclick = function () { i = (i + 1) % deck.length; shown = false; render(); };
+      el.querySelector('.fc-flip').onclick = function () { shown = !shown; render(); };
       if (c.say) el.querySelector('.fc-say').onclick = function () { speak(c.say, opts.rate); };
       el.querySelector('.fc-shuffle').onclick = function () { deck = shuffle(deck); i = 0; shown = false; render(); };
     }
@@ -663,13 +664,18 @@ window.JL = (function () {
     });
   }
 
-  /* ---------- chapter list helper ---------- */
+  /* ---------- chapter list helper (merges the user's custom chapters) ---------- */
   function chapters(kind) {
     var seen = {}, out = [];
     merged(kind).forEach(function (it) {
       var n = (it.chapter != null) ? it.chapter : 0;
       if (!seen[n]) { seen[n] = { n: n, t: it.chapterTitle || ('Lesson ' + n), count: 0 }; out.push(seen[n]); }
       seen[n].count++;
+    });
+    (pref('uchapters') || []).forEach(function (c) {
+      if (!c || c.n == null) return;
+      if (!seen[c.n]) { seen[c.n] = { n: c.n, t: c.t || ('Chapter ' + c.n), count: 0 }; out.push(seen[c.n]); }
+      else seen[c.n].t = c.t || seen[c.n].t;
     });
     out.sort(function (a, b) { return a.n - b.n; });
     return out;

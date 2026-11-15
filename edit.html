@@ -18,6 +18,7 @@
     <button class="tab active" data-tab="vocab">Vocabulary</button>
     <button class="tab" data-tab="grammar">Grammar</button>
     <button class="tab" data-tab="kanji">Kanji</button>
+    <button class="tab" data-tab="chapters">Chapters</button>
     <button class="tab" data-tab="tests">Tests</button>
     <button class="tab" data-tab="data">Backup</button>
   </div>
@@ -40,6 +41,7 @@
       <span class="muted small" id="v-msg"></span>
     </div>
     <div class="toolbar"><input type="search" id="v-list-search" placeholder="Search your words…" style="flex:1;min-width:200px"><span class="muted small" id="v-list-count"></span></div>
+    <div class="chips" id="v-lchips"></div>
     <div id="v-list"></div>
   </div>
 
@@ -65,6 +67,7 @@
         <span class="muted small" id="gr-msg"></span>
       </p>
     </div>
+    <div class="chips" id="gr-lchips"></div>
     <div id="gr-list"></div>
   </div>
 
@@ -89,7 +92,23 @@
       </p>
     </div>
     <div class="toolbar"><input type="search" id="k-list-search" placeholder="Search kanji, readings or meanings…" style="flex:1;min-width:200px"></div>
+    <div class="chips" id="k-lchips"></div>
     <div id="k-list"></div>
+  </div>
+
+  <!-- CHAPTERS -->
+  <div id="panel-chapters" class="tab-panel">
+    <div class="g-card">
+      <h3>📚 Chapters</h3>
+      <p class="muted">Add, rename or delete chapters. They appear on the Kanji, Vocabulary, Grammar and Writing pages, and in every form on this page.</p>
+      <div class="form-grid">
+        <label class="f">Chapter no. <input type="number" id="ch-num" min="1" value="1"></label>
+        <label class="f">Title <input type="text" id="ch-title" placeholder="例：Numbers / Numbers"></label>
+      </div>
+      <button class="btn primary" id="ch-add">💾 Add / update chapter</button>
+      <span class="muted small" id="ch-msg"></span>
+    </div>
+    <div id="ch-list"></div>
   </div>
 
   <!-- TESTS -->
@@ -171,9 +190,11 @@
   /* ============ VOCAB ============ */
   var editV = null;
   function renderVocabList() {
+    renderLChips('v-lchips', 'vocab', vLCh, function (n) { vLCh = n; renderVocabList(); });
     var q = (document.getElementById('v-list-search').value || '').toLowerCase();
     var all = JL.data('vocab');
     var items = all.filter(function (v) {
+      if (vLCh && (v.chapter || 0) !== vLCh) return false;
       return !q || [v.jp, v.rd, v.en, v.mm, v.cat].join(' ').toLowerCase().indexOf(q) >= 0;
     }).slice(0, 400);
     document.getElementById('v-list-count').textContent = all.length + ' words total (showing ' + items.length + ')';
@@ -237,14 +258,99 @@
     document.getElementById('vocab-form-title').textContent = '➕ Add vocabulary';
   };
 
-  /* fill the chapter selector from the book chapters */
-  (function fillChapters() {
+  /* fill the chapter selector from the book chapters (refreshable when chapters change) */
+  function fillChapters() {
     var sel = document.getElementById('v-chapter');
     var chs = JL.chapters('vocab').filter(function (c) { return c.n > 0; });
     sel.innerHTML = '<option value="">— keep category —</option>' +
       '<option value="0">Essential / my words</option>' +
       chs.map(function (c) { return '<option value="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + '</option>'; }).join('');
-  })();
+  }
+  fillChapters();
+
+  /* ============ CHAPTERS CRUD ============ */
+  function setUchapters(arr) { JL.pref('uchapters', (arr || []).sort(function (a, b) { return a.n - b.n; })); }
+  function allChapters() {
+    var seen = {};
+    ['kanji', 'vocab', 'grammar'].forEach(function (k) {
+      JL.chapters(k).forEach(function (c) {
+        if (!seen[c.n]) seen[c.n] = { n: c.n, t: c.t, counts: {} };
+        seen[c.n].counts[k] = c.count;
+      });
+    });
+    return Object.keys(seen).map(function (key) { return seen[key]; }).sort(function (a, b) { return a.n - b.n; });
+  }
+  function renderChapterList() {
+    var list = allChapters();
+    var el = document.getElementById('ch-list');
+    el.innerHTML = '<table class="list"><tr><th>Ch.</th><th>Title</th><th>Kanji</th><th>Vocab</th><th>Grammar</th><th></th></tr>' +
+      list.map(function (c) {
+        return '<tr><td><b>' + c.n + '</b></td><td class="jp">' + JL.esc(c.t) + '</td><td>' + (c.counts.kanji || 0) + '</td><td>' + (c.counts.vocab || 0) + '</td><td>' + (c.counts.grammar || 0) + '</td>' +
+          '<td><button class="btn small" data-chrename="' + c.n + '">✏️ Rename</button> <button class="btn small ghost" data-chdel="' + c.n + '">🗑 Delete</button></td></tr>';
+      }).join('') + '</table>';
+    Array.prototype.forEach.call(el.querySelectorAll('[data-chrename]'), function (b) {
+      b.onclick = function () {
+        var c = list.filter(function (x) { return String(x.n) === b.dataset.chrename; })[0];
+        var t = prompt('New title for chapter ' + c.n + ':', c.t);
+        if (t && t.trim()) {
+          var arr = JL.pref('uchapters') || [];
+          var ex = arr.filter(function (x) { return x.n === c.n; })[0];
+          if (ex) ex.t = t.trim(); else arr.push({ n: c.n, t: t.trim() });
+          setUchapters(arr);
+          renderChapterList(); fillChapters(); renderVocabList(); renderGrammarList(); renderKanjiList();
+          JL.toast('Chapter renamed.');
+        }
+      };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-chdel]'), function (b) {
+      b.onclick = function () {
+        var c = list.filter(function (x) { return String(x.n) === b.dataset.chdel; })[0];
+        var total = (c.counts.kanji || 0) + (c.counts.vocab || 0) + (c.counts.grammar || 0);
+        if (!confirm('Delete chapter ' + c.n + '章 ' + c.t + '?' + (total ? ' Its ' + total + ' items will move to chapter 0 (unassigned).' : ''))) return;
+        ['kanji', 'vocab', 'grammar'].forEach(function (k) {
+          JL.data(k).forEach(function (it) {
+            var gn = (it.chapter != null) ? it.chapter : (it.lesson || 0);
+            if (gn === c.n) {
+              it.chapter = 0;
+              it.chapterTitle = (k === 'grammar') ? 'Lesson 0' : '';
+              JL.save(k, it);
+            }
+          });
+        });
+        setUchapters((JL.pref('uchapters') || []).filter(function (x) { return x.n !== c.n; }));
+        vLCh = gLCh = kLCh = 0;
+        renderChapterList(); fillChapters(); renderVocabList(); renderGrammarList(); renderKanjiList();
+        JL.toast('Chapter deleted. Its items moved to chapter 0.');
+      };
+    });
+  }
+  document.getElementById('ch-add').onclick = function () {
+    var n = parseInt(document.getElementById('ch-num').value, 10);
+    var t = document.getElementById('ch-title').value.trim();
+    if (!n || n < 1 || !t) { document.getElementById('ch-msg').textContent = 'Chapter number and title are required.'; return; }
+    var arr = JL.pref('uchapters') || [];
+    var ex = arr.filter(function (c) { return c.n === n; })[0];
+    if (ex) ex.t = t; else arr.push({ n: n, t: t });
+    setUchapters(arr);
+    document.getElementById('ch-msg').textContent = '✓ Chapter saved!';
+    document.getElementById('ch-title').value = '';
+    renderChapterList(); fillChapters(); renderVocabList(); renderGrammarList(); renderKanjiList();
+    setTimeout(function () { document.getElementById('ch-msg').textContent = ''; }, 2500);
+  };
+  (function () { var ac = allChapters(); document.getElementById('ch-num').value = ac.length ? (ac[ac.length - 1].n + 1) : 1; })();
+
+  /* ============ chapter tabs on the edit lists ============ */
+  var vLCh = 0, gLCh = 0, kLCh = 0;
+  function renderLChips(elId, kind, cur, onPick) {
+    var el = document.getElementById(elId);
+    el.innerHTML = '<button class="chip' + (cur === 0 ? ' active' : '') + '" data-n="0">All</button>' +
+      JL.chapters(kind).filter(function (c) { return c.n > 0; }).map(function (c) {
+        return '<button class="chip' + (cur === c.n ? ' active' : '') + '" data-n="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + ' (' + c.count + ')</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { onPick(parseInt(b.dataset.n, 10)); };
+    });
+  }
 
   /* ============ GRAMMAR ============ */
   var editG = null;
@@ -256,7 +362,11 @@
   document.getElementById('gr-add-exr').onclick = function () { rowsHtml(document.getElementById('gr-exercises'), QF); };
 
   function renderGrammarList() {
-    var all = JL.data('grammar').sort(function (a, b) { return (a.lesson || 0) - (b.lesson || 0); });
+    renderLChips('gr-lchips', 'grammar', gLCh, function (n) { gLCh = n; renderGrammarList(); });
+    var all = JL.data('grammar').filter(function (g) {
+      var gn = (g.chapter != null) ? g.chapter : (g.lesson || 0);
+      return !gLCh || gn === gLCh;
+    }).sort(function (a, b) { return (a.lesson || 0) - (b.lesson || 0); });
     var el = document.getElementById('gr-list');
     el.innerHTML = '<table class="list"><tr><th>#</th><th>Title</th><th>Pattern</th><th>Meaning</th><th></th></tr>' +
       all.map(function (g) {
@@ -300,7 +410,7 @@
     var item = editG || { id: uid() };
     item.lesson = parseInt(document.getElementById('gr-lesson').value, 10) || 1;
     item.chapter = item.lesson;
-    item.chapterTitle = 'Lesson ' + item.lesson;
+    item.chapterTitle = (JL.chapters('grammar').filter(function (c) { return c.n === item.lesson; })[0] || {}).t || ('Lesson ' + item.lesson);
     item.title = title;
     item.pattern = document.getElementById('gr-pattern').value.trim();
     item.meaning = document.getElementById('gr-meaning').value.trim();
@@ -341,7 +451,7 @@
     item.meaning = document.getElementById('k-mm').value.trim();
     item.en = document.getElementById('k-en').value.trim();
     item.chapter = parseInt(document.getElementById('k-chapter').value, 10) || 1;
-    item.chapterTitle = 'My kanji';
+    item.chapterTitle = (JL.chapters('kanji').filter(function (c) { return c.n === item.chapter; })[0] || {}).t || 'My kanji';
     item.examples = readRows(document.getElementById('k-examples')).filter(function (r) { return r[0]; })
       .map(function (r) { return { word: r[0], reading: r[1], meaning: r[2] }; });
     JL.save('kanji', item);
@@ -360,9 +470,11 @@
     document.getElementById('k-form-title').textContent = '➕ Add kanji';
   };
   function renderKanjiList() {
+    renderLChips('k-lchips', 'kanji', kLCh, function (n) { kLCh = n; renderKanjiList(); });
     var q = (document.getElementById('k-list-search') ? document.getElementById('k-list-search').value : '') || '';
     q = q.trim().toLowerCase();
     var all = JL.data('kanji').filter(function (k) {
+      if (kLCh && (k.chapter || 0) !== kLCh) return false;
       return !q || [k.kanji, (k.on || []).join(' '), k.kun, k.en, k.meaning].join(' ').toLowerCase().indexOf(q) >= 0 ||
         (k.examples || []).some(function (e) { return (e.word + ' ' + e.reading + ' ' + e.meaning).toLowerCase().indexOf(q) >= 0; });
     });
@@ -547,7 +659,7 @@
         localStorage.setItem('jl_user_v1', JSON.stringify(cur));
         JL.sync.push();
         JL.toast('Backup imported!');
-        renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList();
+        renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList(); renderChapterList(); fillChapters();
       } catch (e) { JL.toast('Could not read that file — is it a valid backup?'); }
     };
     reader.readAsText(f);
@@ -561,7 +673,7 @@
     localStorage.setItem('jl_user_v1', JSON.stringify(u));
     JL.sync.push();
     JL.toast('Restored ' + n + ' items.');
-    renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList();
+    renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList(); renderChapterList(); fillChapters();
   };
   document.getElementById('d-reset').onclick = function () {
     if (confirm('This deletes ALL your additions, edits, custom tests and file list on ALL your synced devices. The original book data stays. Continue?')) {
@@ -570,13 +682,13 @@
       JL.sync.push();
       JL.toast('All your changes were reset.');
       editV = editG = editK = null;
-      renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList();
+      renderStats(); renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList(); renderChapterList(); fillChapters();
     }
   };
 
   document.getElementById('k-list-search').oninput = renderKanjiList;
 
-  renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList(); renderStats();
+  renderVocabList(); renderGrammarList(); renderKanjiList(); renderTestList(); renderStats(); renderChapterList();
   handleEditDeepLink();
 })();
 </script>

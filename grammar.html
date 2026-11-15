@@ -12,7 +12,7 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">文 Grammar Learning &amp; Exercises</h1>
-  <p class="subtitle">N5 grammar points in lesson order — each with a clear explanation, example sentences you can listen to, and interactive exercises.</p>
+  <p class="subtitle">N5 grammar points grouped by chapter/lesson — tap a chapter to see its grammar, then study each point with examples you can listen to and interactive exercises.</p>
 
   <div id="tts-banner"></div>
 
@@ -21,8 +21,15 @@
     <button class="btn primary" id="g-practice-all">📝 Practice all exercises</button>
   </div>
 
-  <div class="chips" id="lesson-chips"></div>
-  <div id="g-list"></div>
+  <div class="chapter-grid" id="chapter-grid"></div>
+  <div id="chapter-view" style="display:none">
+    <div class="view-head">
+      <button class="btn ghost" id="back-chapters">📚 Chapters</button>
+      <b id="cur-chapter-title" class="jp"></b>
+      <span class="muted small" id="g-count"></span>
+    </div>
+    <div id="g-list"></div>
+  </div>
 
   <!-- exercise modal -->
   <div class="modal hidden" id="g-modal">
@@ -42,26 +49,42 @@
 (function () {
   var ALL = JL.data('grammar');
   JL.ttsBanner('tts-banner');
-  var q = '', lesson = 0;
+  var q = '', ch = 0, view = 'chapters';
 
-  function renderChips() {
-    var el = document.getElementById('lesson-chips');
-    el.innerHTML = '<button class="chip' + (lesson === 0 ? ' active' : '') + '" data-n="0">All lessons (' + ALL.length + ')</button>' +
+  function renderChapters() {
+    var el = document.getElementById('chapter-grid');
+    el.innerHTML = '<div class="chapter-card" data-n="0"><span class="ch-num">📖</span><span class="ch-title">All grammar</span><span class="ch-count">' + ALL.length + ' points</span></div>' +
       JL.chapters('grammar').map(function (c) {
-        return '<button class="chip' + (lesson === c.n ? ' active' : '') + '" data-n="' + c.n + '">L' + c.n + ' (' + c.count + ')</button>';
+        return '<div class="chapter-card" data-n="' + c.n + '"><span class="ch-num jp">' + (c.n || '?') + '</span>' +
+          '<span class="ch-title jp">' + JL.esc(c.t) + '</span><span class="ch-count">' + c.count + ' points</span></div>';
       }).join('');
-    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
-      b.onclick = function () { lesson = parseInt(b.dataset.n, 10); renderChips(); render(); };
+    Array.prototype.forEach.call(el.querySelectorAll('.chapter-card'), function (b) {
+      b.onclick = function () {
+        ch = parseInt(b.dataset.n, 10);
+        view = 'list';
+        document.getElementById('chapter-grid').style.display = 'none';
+        document.getElementById('chapter-view').style.display = '';
+        var c = JL.chapters('grammar').filter(function (x) { return x.n === ch; })[0];
+        document.getElementById('cur-chapter-title').textContent = ch ? ((c && c.t ? c.t : 'Lesson ' + ch)) : 'All grammar';
+        render();
+      };
     });
   }
+  document.getElementById('back-chapters').onclick = function () {
+    view = 'chapters'; q = ''; document.getElementById('g-search').value = '';
+    document.getElementById('chapter-view').style.display = 'none';
+    document.getElementById('chapter-grid').style.display = '';
+  };
 
   function render() {
     var list = ALL.filter(function (g) {
-      if (lesson && (g.lesson || 0) !== lesson) return false;
+      var gn = (g.chapter != null) ? g.chapter : (g.lesson || 0);
+      if (ch && !q && gn !== ch) return false;
       if (!q) return true;
       var hay = [g.title, g.pattern, g.meaning, g.explanation, String(g.lesson), g.mm].join(' ').toLowerCase();
       return hay.indexOf(q.toLowerCase()) >= 0;
     }).sort(function (a, b) { return (a.lesson || 0) - (b.lesson || 0); });
+    document.getElementById('g-count').textContent = list.length + ' points';
 
     document.getElementById('g-list').innerHTML = list.map(function (g) {
       var ex = (g.examples || []).map(function (e) {
@@ -110,7 +133,16 @@
     if (e.target === document.getElementById('g-modal')) document.getElementById('g-modal').classList.add('hidden');
   };
 
-  document.getElementById('g-search').oninput = function () { q = this.value.trim(); render(); };
+  document.getElementById('g-search').oninput = function () {
+    q = this.value.trim();
+    if (q && view === 'chapters') {
+      view = 'list';
+      document.getElementById('chapter-grid').style.display = 'none';
+      document.getElementById('chapter-view').style.display = '';
+      document.getElementById('cur-chapter-title').textContent = 'Search results';
+    }
+    if (view === 'list') render();
+  };
 
   document.getElementById('g-practice-all').onclick = function () {
     var all = [];
@@ -121,7 +153,7 @@
     JL.quiz(area, all, { title: 'Mixed grammar practice' });
   };
 
-  renderChips();
+  renderChapters();
   render();
 })();
 </script>
