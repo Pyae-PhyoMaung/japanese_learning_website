@@ -6,6 +6,11 @@
 <title>Listening | Japanese Learning</title>
 <link rel="stylesheet" href="css/style.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  .sent-row { padding:10px 4px; border-bottom:1px solid rgba(128,128,128,.25); line-height:1.6; }
+  .sent-row:last-child { border-bottom:none; }
+  .sent-row .btn { margin-right:8px; }
+</style>
 </head>
 <body>
 <header class="topbar"><span class="brand-badge jp">聴解</span><span class="brand-title">Listening Session</span></header>
@@ -17,7 +22,7 @@
   <div class="notice" id="tts-note">Checking Japanese voice…</div>
 
   <div class="toolbar">
-    <label class="f" style="flex-direction:row;align-items:center;gap:8px">🐢 Speed <input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="0.9" style="width:160px"> <b id="rate-val">0.9</b> 🐇</label>
+    <label class="f" style="flex-direction:row;align-items:center;gap:8px;flex-basis:100%">🐢 Speed <input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="0.9" style="width:160px"> <b id="rate-val">0.9</b> 🐇</label>
     <label class="f">Chapter <select id="ch-filter"><option value="">All chapters</option></select></label>
   </div>
 
@@ -52,6 +57,10 @@
         <button class="btn primary" id="s-next">Next sentence →</button>
       </div>
       <div class="reveal-box jp" id="s-reveal-box">…</div>
+    </div>
+    <div class="listen-card" style="margin-top:16px">
+      <h3 id="s-list-title">All sentences</h3>
+      <div id="s-list"></div>
     </div>
   </div>
 
@@ -117,6 +126,7 @@
       document.getElementById('d-result').textContent = '';
       document.getElementById('d-score').textContent = '0';
       dScore = 0;
+      renderSentList();
     };
   })();
 
@@ -148,6 +158,28 @@
       '<b>' + JL.esc(s.jp) + '</b><br><span class="muted">' + JL.esc(s.rd || '') + '</span><br>' + JL.esc(s.en || '') + (s.mm ? '<br><span class="jp">' + JL.esc(s.mm) + '</span>' : '');
   };
   document.getElementById('s-next').onclick = nextSent;
+
+  /* chapter sentence list */
+  function renderSentList() {
+    var el = document.getElementById('s-list');
+    var title = document.getElementById('s-list-title');
+    if (CH == null) {
+      title.textContent = 'All sentences (' + SENT.length + ')';
+    } else {
+      var c = JL.chapters('sentences').filter(function (x) { return x.n === CH; })[0];
+      title.textContent = (c ? (CH + '章 ' + c.t) : ('Chapter ' + CH)) + ' — sentences (' + SENT.length + ')';
+    }
+    el.innerHTML = SENT.map(function (it, i) {
+      return '<div class="sent-row"><button class="btn small" data-si="' + i + '" title="Play">🔊</button>' +
+        '<b class="jp">' + JL.esc(it.jp) + '</b> <span class="muted">' + JL.esc(it.rd || '') + '</span>' +
+        (CH == null && it.chapter ? ' <span class="muted small">' + it.chapter + '章</span>' : '') +
+        '<br>' + JL.esc(it.en || '') + (it.mm ? ' · <span class="jp">' + JL.esc(it.mm) + '</span>' : '') + '</div>';
+    }).join('') || '<p class="muted">No sentences in this chapter yet.</p>';
+    Array.prototype.forEach.call(el.querySelectorAll('[data-si]'), function (b) {
+      b.onclick = function () { var it = SENT[Number(b.dataset.si)]; if (it) JL.speak(it.jp, rate); };
+    });
+  }
+  renderSentList();
 
   /* dictation */
   var dPool = SENT.slice();
