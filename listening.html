@@ -127,12 +127,12 @@
   /* dictation */
   var dPool = SENT.slice();
   var d = null, dScore = 0;
-  function nextD() {
+  function nextD(speakIt) {
     if (!dPool.length) dPool = JL.shuffle(SENT);
     d = dPool.pop();
     document.getElementById('d-input').value = '';
     document.getElementById('d-result').textContent = '';
-    setTimeout(function () { JL.speak(d.jp, rate); }, 300);
+    if (speakIt) setTimeout(function () { JL.speak(d.jp, rate); }, 300);
   }
   document.getElementById('d-play').onclick = function () { if (d) JL.speak(d.jp, rate); };
   document.getElementById('d-check').onclick = function () {
@@ -154,12 +154,12 @@
     document.getElementById('d-result').innerHTML =
       '<b class="ok">Answer:</b> <span class="jp">' + JL.esc(d.rd || d.jp) + '</span><br><span class="jp">' + JL.esc(d.jp) + '</span> — ' + JL.esc(d.en || '') + (d.mm ? ' — <span class="jp">' + JL.esc(d.mm) + '</span>' : '');
   };
-  document.getElementById('d-next').onclick = nextD;
+  document.getElementById('d-next').onclick = function () { nextD(true); };
   document.getElementById('d-input').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') document.getElementById('d-check').click();
   });
 
-  nextD();
+  nextD(false);
 })();
 </script>
 </body>
