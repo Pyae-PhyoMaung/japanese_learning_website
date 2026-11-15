@@ -152,6 +152,7 @@
   <footer class="page-foot">Tip: exported backups can be shared with friends — they can import them on this same page.</footer>
 </main>
 <script src="js/data.js"></script>
+<script src="js/zg2uni.js"></script>
 <script src="js/app.js"></script>
 <script>
 (function () {
@@ -291,7 +292,7 @@
     Array.prototype.forEach.call(el.querySelectorAll('[data-chrename]'), function (b) {
       b.onclick = function () {
         var c = list.filter(function (x) { return String(x.n) === b.dataset.chrename; })[0];
-        var t = prompt('New title for chapter ' + c.n + ':', c.t);
+        var t = JL.mmfix(prompt('New title for chapter ' + c.n + ':', c.t));
         if (t && t.trim()) {
           var arr = JL.pref('uchapters') || [];
           var ex = arr.filter(function (x) { return x.n === c.n; })[0];
@@ -655,6 +656,7 @@
           mine.edited = Object.assign({}, imp.edited || {}, mine.edited || {});
           cur[k] = mine;
         });
+        JL.mmfix(cur);
         cur._sync = { at: Date.now(), dev: 'import' };
         localStorage.setItem('jl_user_v1', JSON.stringify(cur));
         JL.sync.push();

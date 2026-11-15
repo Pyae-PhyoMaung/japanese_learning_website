@@ -111,6 +111,7 @@ window.JL = (function () {
     var u = getUser();
     if (!u.prefs) u.prefs = {};
     if (typeof val === 'undefined') return u.prefs[key];
+    val = mmfixValue(val);
     u.prefs[key] = val;
     setUser(u);
     return val;
@@ -133,7 +134,61 @@ window.JL = (function () {
     (u.added || []).forEach(function (it) { out.push(it); });
     return out;
   }
+  /* ---------- Myanmar (Burmese) text: always store real Unicode, never Zawgyi ---------- */
+  /* js/zg2uni.js is a vendored copy of Google's myanmar-tools (Zawgyi detector + converter).
+     It turns Zawgyi — or wrongly-ordered "visual order" typing — into proper Unicode Myanmar,
+     and leaves Japanese, English and already-correct Unicode untouched. */
+  function mmfixValue(v) {
+    try {
+      var ZG = window.JL_ZG;
+      if (!ZG) return v;
+      if (typeof v === 'string') return ZG.fix(v);
+      if (Object.prototype.toString.call(v) === '[object Array]') {
+        for (var i = 0; i < v.length; i++) v[i] = mmfixValue(v[i]);
+        return v;
+      }
+      if (v && typeof v === 'object') {
+        for (var k in v) v[k] = mmfixValue(v[k]);
+      }
+    } catch (e) {}
+    return v;
+  }
+  /* one-time migration: fix everything saved so far (setUser also pushes the fixed copy to the cloud) */
+  function migrateZg() {
+    try {
+      if (!window.JL_ZG) return;
+      if (localStorage.getItem('jl_zgfix_v1')) return;
+      localStorage.setItem('jl_zgfix_v1', '1');
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var u = getUser();
+      mmfixValue(u);
+      if (JSON.stringify(u) !== raw) setUser(u);
+    } catch (e) {}
+  }
+  function loadZg() {
+    if (window.JL_ZG) { migrateZg(); return; }
+    var s = document.createElement('script');
+    s.src = 'js/zg2uni.js';
+    s.onload = function () { migrateZg(); };
+    s.onerror = function () {};
+    (document.head || document.getElementsByTagName('head')[0]).appendChild(s);
+  }
+  loadZg();
+  /* convert Zawgyi in any text field the moment the user leaves it */
+  document.addEventListener('blur', function (ev) {
+    try {
+      var t = ev.target, ZG = window.JL_ZG;
+      if (!ZG || !t || !t.tagName) return;
+      var isField = (t.tagName === 'INPUT' && t.type === 'text') || t.tagName === 'TEXTAREA';
+      if (!isField) return;
+      var f = ZG.fix(t.value);
+      if (f !== t.value) { t.value = f; toast('Myanmar text converted to Unicode ✓'); }
+    } catch (e2) {}
+  }, true);
+
   function save(kind, item) {
+    item = mmfixValue(item);
     var u = kindStore(kind); var s = u[kind];
     if (String(item.id).indexOf('u_') === 0) {
       var found = -1;
@@ -482,6 +537,7 @@ window.JL = (function () {
     return 'other';
   }
   function fileMetaAdd(meta) {
+    meta = mmfixValue(meta);
     var u = getUser();
     if (!u.files || !u.files.added) u.files = { added: [] };
     var found = -1;
@@ -697,7 +753,7 @@ window.JL = (function () {
     quiz: quiz, flashcards: flashcards, pad: pad,
     files: { list: filesList, put: filePut, get: fileGet, del: fileDel, cat: fileCat },
     sync: { push: pushUserData, pull: pullUserData, live: startLiveSync },
-    pref: pref, chapters: chapters, kimg: { get: kimgGet, set: kimgSet }
+    pref: pref, chapters: chapters, kimg: { get: kimgGet, set: kimgSet }, mmfix: mmfixValue
   };
 })();
 document.addEventListener('DOMContentLoaded', function () { JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.sync.pull(); JL.sync.live(); });
