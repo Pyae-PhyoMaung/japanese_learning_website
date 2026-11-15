@@ -6,22 +6,57 @@
 <title>Study Partner | Japanese Learning</title>
 <link rel="stylesheet" href="css/style.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  .chat-shell { border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); background: #fff; }
+  .chat-head { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); background: #fff; flex-wrap: wrap; }
+  .chat-head select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; flex: 1; min-width: 160px; background: #fff; font-family: inherit; }
+  .chat-log { display: flex; flex-direction: column; gap: 10px; padding: 16px; max-height: 56vh; overflow-y: auto; background: #f6f8fb; }
+  .msg { max-width: 85%; border-radius: 14px; padding: 10px 14px; font-size: .95rem; line-height: 1.55; }
+  .msg-user { align-self: flex-end; background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
+  .msg-bot { align-self: flex-start; background: #fff; border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg-meta { font-size: .68rem; opacity: .6; margin-top: 5px; }
+  .msg-user .msg-meta { text-align: right; }
+  .typing { display: flex; gap: 4px; align-items: center; padding: 14px 16px; }
+  .typing .dot { width: 7px; height: 7px; border-radius: 50%; background: #9aa4b2; animation: pj-blink 1.2s infinite; }
+  .typing .dot:nth-child(2) { animation-delay: .2s; }
+  .typing .dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes pj-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  .chat-sugg { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 4px; background: #fff; border-top: 1px solid var(--border); }
+  .sugg { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 4px 12px; font-size: .8rem; cursor: pointer; font-family: inherit; }
+  .sugg:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .chat-compose { display: flex; gap: 8px; padding: 12px 14px; background: #fff; }
+  #p-in { flex: 1; border: 1px solid var(--border); border-radius: 999px; padding: 10px 18px; font-size: .95rem; font-family: inherit; }
+  #p-send { border-radius: 999px; padding: 10px 20px; }
+  .pf { width: 100%; }
+  .pf-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pf-row input, .pf-row select { border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: .88rem; font-family: inherit; background: #fff; }
+  .pf .btn { margin-top: 10px; }
+  .pf .muted { display: block; margin-top: 6px; }
+</style>
 </head>
 <body>
 <header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">Study Partner</span></header>
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">🤝 Study Partner</h1>
-  <p class="subtitle">Your on-site study companion — ask about words, kanji and grammar, take quick quizzes, or get random words to learn. It answers from your books and your own edits.</p>
+  <p class="subtitle">Your on-site study companion — look things up, take quizzes, and add new vocab, kanji, listening sentences or even whole quizzes right from the chat. It remembers your conversations, and everything you add shows up on the other pages.</p>
 
-  <div class="g-card" id="chat" style="max-height:62vh;overflow-y:auto"></div>
-  <div class="toolbar" style="margin-top:12px">
-    <input id="p-in" placeholder="e.g. meaning of 食べる · kanji 雨 · grammar てください · quiz me on vocab · random word · my files · help" style="flex:1">
-    <button class="btn primary" id="p-send">Send</button>
+  <div class="chat-shell">
+    <div class="chat-head">
+      <select id="chat-list" title="Your saved conversations"></select>
+      <span class="muted small" id="chat-count"></span>
+      <button class="btn small ghost" id="chat-del" title="Delete this conversation">🗑</button>
+      <button class="btn small primary" id="chat-new">＋ New chat</button>
+    </div>
+    <div class="chat-log" id="chat"></div>
+    <div class="chat-sugg" id="p-sugg"></div>
+    <div class="chat-compose">
+      <input id="p-in" placeholder="Ask me anything… e.g. meaning of 食べる · quiz me on vocab · add kanji">
+      <button class="btn primary" id="p-send">Send ➤</button>
+    </div>
   </div>
-  <p class="muted small">To add, edit or delete kanji, vocabulary, grammar or tests, go to <a href="edit.html">Add / Edit</a> — or just type “edit vocab”.</p>
 
-  <footer class="page-foot">The partner answers from your local study data (works offline). A full cloud-AI tutor over your PDFs would need a Genie space with the content in Unity Catalog.</footer>
+  <footer class="page-foot">The partner answers from your local study data (works offline) and your chats are saved in this browser. A full cloud-AI tutor over your PDFs would need a Genie space with the content in Unity Catalog.</footer>
 </main>
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
@@ -30,13 +65,81 @@
   var chat = document.getElementById('chat');
   var FICONS = { pdf: '📚', image: '🖼️', video: '🎬', audio: '🎵', doc: '📄', other: '📦' };
 
-  function bubble(who, html) {
+  /* ---------- chat history (saved in this browser, survives reloads) ---------- */
+  var CHATS_KEY = 'jl_chats_v1', CUR_KEY = 'jl_chat_cur';
+  var chats = [], cur = null, RECORD = true;
+
+  function fmtTs(ts) {
+    try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; }
+  }
+  function loadChats() {
+    try { chats = JSON.parse(localStorage.getItem(CHATS_KEY) || '[]'); } catch (e) { chats = []; }
+    if (!Array.isArray(chats)) chats = [];
+    cur = chats.filter(function (c) { return c.id === (localStorage.getItem(CUR_KEY) || ''); })[0] || null;
+    if (!cur) { cur = { id: 'c' + Date.now(), title: 'New chat', at: Date.now(), msgs: [] }; chats.unshift(cur); }
+  }
+  function persistChats() {
+    while (chats.length > 20) chats.pop();
+    try {
+      localStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+      localStorage.setItem(CUR_KEY, cur ? cur.id : '');
+    } catch (e) {}
+    renderChatList();
+  }
+  function renderChatList() {
+    var sel = document.getElementById('chat-list');
+    if (!sel) return;
+    sel.innerHTML = chats.map(function (c) {
+      return '<option value="' + c.id + '"' + (cur && c.id === cur.id ? ' selected' : '') + '>' + JL.esc(c.title.slice(0, 40)) + '</option>';
+    }).join('');
+    var cnt = document.getElementById('chat-count');
+    if (cnt) cnt.textContent = chats.length > 1 ? chats.length + ' saved chats' : '';
+  }
+  function restore() {
+    RECORD = false;
+    chat.innerHTML = '';
+    (cur.msgs || []).forEach(function (m) {
+      var d = document.createElement('div');
+      d.className = 'msg msg-' + m.w;
+      d.innerHTML = m.h + (m.q ? '<br><button class="btn small" data-regen="' + JL.esc(m.q) + '">▶ Take this quiz again</button>' : '') +
+        '<div class="msg-meta">' + fmtTs(m.ts) + '</div>';
+      chat.appendChild(d);
+      bindSay(d); bindForm(d);
+    });
+    RECORD = true;
+    Array.prototype.forEach.call(chat.querySelectorAll('[data-regen]'), function (b) {
+      b.onclick = function () { document.getElementById('p-in').value = 'quiz me on ' + b.dataset.regen; send(); };
+    });
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  /* ---------- bubbles + typing indicator ---------- */
+  var typingEl = null;
+  function showTyping() {
+    hideTyping();
+    typingEl = document.createElement('div');
+    typingEl.className = 'msg msg-bot typing';
+    typingEl.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    chat.appendChild(typingEl);
+    chat.scrollTop = chat.scrollHeight;
+  }
+  function hideTyping() { if (typingEl) { typingEl.remove(); typingEl = null; } }
+
+  function bubble(who, html, opts) {
+    opts = opts || {};
+    var ts = Date.now();
     var d = document.createElement('div');
     d.className = 'msg msg-' + who;
-    d.innerHTML = html;
+    d.innerHTML = html + '<div class="msg-meta">' + fmtTs(ts) + '</div>';
     chat.appendChild(d);
-    bindSay(d);
+    bindSay(d); bindForm(d);
     chat.scrollTop = chat.scrollHeight;
+    if (RECORD && cur) {
+      cur.msgs.push({ w: who, h: html, q: opts.quiz || null, ts: ts });
+      cur.at = ts;
+      if (cur.msgs.length > 200) cur.msgs = cur.msgs.slice(-200);
+      persistChats();
+    }
     return d;
   }
   function bindSay(el) {
@@ -44,7 +147,138 @@
       b.onclick = function () { JL.speak(b.dataset.say); };
     });
   }
-  function reply(html) { setTimeout(function () { bubble('bot', html); }, 300); }
+  function reply(html, opts) {
+    showTyping();
+    setTimeout(function () { hideTyping(); bubble('bot', html, opts); }, 350 + Math.random() * 350);
+  }
+
+  /* ---------- add-content forms (vocab / kanji / sentence / quiz) ---------- */
+  function chOpts() {
+    var chs = JL.chapters('vocab').filter(function (c) { return c.n > 0; });
+    return '<option value="">— no chapter —</option>' + chs.map(function (c) {
+      return '<option value="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + '</option>';
+    }).join('');
+  }
+  function chTitle(n) {
+    var c = JL.chapters('vocab').filter(function (x) { return x.n === n; })[0];
+    return c ? c.t : ('Chapter ' + n);
+  }
+  function uid2() { return 'u_' + Date.now() + Math.random().toString(36).slice(2, 6); }
+
+  function showAddForm(what, prefill) {
+    var label = what === 'vocab' ? 'vocabulary' : what === 'kanji' ? 'kanji' : 'listening sentence';
+    var jpPh = what === 'kanji' ? 'Kanji character (漢字) *' : what === 'sentence' ? 'Japanese sentence (文) *' : 'Japanese word (語彙) *';
+    var page = what === 'vocab' ? 'Vocab' : what === 'kanji' ? 'Kanji' : 'Listening';
+    var f = '<div class="pf" data-kind="' + what + '">' +
+      '<b>➕ Add ' + label + '</b>' +
+      '<div class="pf-row"><input data-f="jp" placeholder="' + jpPh + '" value="' + JL.esc(prefill || '') + '" style="flex:1"></div>' +
+      '<div class="pf-row"><input data-f="rd" placeholder="Reading (ひらがな)" style="flex:1"></div>';
+    if (what === 'kanji') {
+      f += '<div class="pf-row"><input data-f="on" placeholder="On readings (カンマで区切る)" style="flex:1"><input data-f="kun" placeholder="Kun reading" style="flex:1"></div>';
+    }
+    f += '<div class="pf-row"><input data-f="en" placeholder="English meaning *" style="flex:1"></div>' +
+      '<div class="pf-row"><input data-f="mm" placeholder="Burmese meaning (မြန်မာ)" style="flex:1"></div>' +
+      '<div class="pf-row"><select data-f="chapter">' + chOpts() + '</select></div>' +
+      '<button class="btn small primary" data-do="' + what + '">💾 Save ' + label + '</button>' +
+      '<span class="muted small">Saved to your data — it appears on the ' + page + ' page and syncs everywhere.</span></div>';
+    reply(f);
+  }
+
+  function showQuizForm(rest) {
+    var f = '<div class="pf" data-kind="quiz">' +
+      '<b>➕ Make a quiz</b>' +
+      '<div class="pf-row"><input data-f="title" placeholder="Quiz title *" value="' + JL.esc(rest || '') + '" style="flex:1"></div>' +
+      '<div class="pf-row"><select data-f="src">' +
+      '<option value="vocab">Vocabulary — which word matches the meaning?</option>' +
+      '<option value="kanji">Kanji — which kanji matches the meaning?</option>' +
+      '<option value="grammar">Grammar — mixed exercises</option>' +
+      '</select><select data-f="chapter">' + chOpts() + '</select></div>' +
+      '<div class="pf-row"><input data-f="count" type="number" min="3" max="20" value="10" style="width:90px"> <span class="muted small">questions</span></div>' +
+      '<button class="btn small primary" data-do="quiz">💾 Save quiz</button>' +
+      '<span class="muted small">Saved to <a href="tests.html">My tests</a> — take it anytime.</span></div>';
+    reply(f);
+  }
+
+  function buildQuizQuestions(src, ch, n) {
+    var inCh = function (x) { return !ch || Number(x.chapter != null ? x.chapter : 0) === ch; };
+    if (src === 'grammar') {
+      var ex = [];
+      JL.data('grammar').filter(inCh).forEach(function (g) {
+        ((g.exercises || g.ex) || []).forEach(function (e) { ex.push({ q: e.q, opts: e.opts, ans: e.ans }); });
+      });
+      return JL.pickN(ex, n);
+    }
+    var pool = JL.data(src === 'kanji' ? 'kanji' : 'vocab').filter(inCh);
+    if (pool.length < 4) return null;
+    return JL.pickN(pool, n).map(function (it) {
+      var key = src === 'kanji' ? 'kanji' : 'jp';
+      var wrongs = JL.pickN(pool.filter(function (x) { return x[key] !== it[key]; }), 3);
+      var opts = JL.shuffle([it[key]].concat(wrongs.map(function (w) { return w[key]; })));
+      return { q: 'Which ' + src + ' means “' + JL.esc(it.en || it.meaning || it.mm || '') + '”?', opts: opts, ans: opts.indexOf(it[key]), say: it[key] };
+    });
+  }
+
+  function doAdd(what, v) {
+    if (what === 'kanji') {
+      if (!v.kanji || !v.en) { reply('I need at least the kanji and its English meaning — or use the one-line form: <b>add kanji 食|しょく|た(べる)|eat|စားသည်| chapter 10</b>'); return; }
+      var kn = Number(v.chapter) || 1;
+      var kItem = { id: uid2(), kanji: v.kanji, on: (v.on || '').split(/[,、\s]+/).filter(Boolean), kun: v.kun || '', en: v.en, meaning: v.mm || '', chapter: kn, chapterTitle: chTitle(kn) };
+      JL.save('kanji', kItem);
+      reply('✅ Kanji <b class="jp" style="font-size:1.5rem">' + JL.esc(kItem.kanji) + '</b> saved to chapter ' + kn + ' (' + JL.esc(chTitle(kn)) +
+        '). See it on the <a href="kanji.html">Kanji page</a> · <a href="edit.html">edit it</a> <button class="btn small ghost" data-say="' + JL.esc(kItem.kanji) + '">🔊</button>');
+      return;
+    }
+    if (what === 'sentence') {
+      if (!v.jp || !v.en) { reply('I need the sentence and its English meaning — or use the one-line form: <b>add sentence おいしいです。|おいしい です|It is delicious.|| chapter 10</b>'); return; }
+      var sn = Number(v.chapter) || 0;
+      var sItem = { id: uid2(), jp: v.jp, rd: v.rd || '', en: v.en, mm: v.mm || '', cat: 'My sentences', chapter: sn, chapterTitle: sn ? chTitle(sn) : '' };
+      JL.save('sentences', sItem);
+      reply('✅ Sentence <b class="jp">' + JL.esc(sItem.jp) + '</b> saved' + (sn ? ' to chapter ' + sn + ' (' + JL.esc(chTitle(sn)) + ')' : '') +
+        '. Practice it on the <a href="listening.html">Listening page</a> <button class="btn small ghost" data-say="' + JL.esc(sItem.jp) + '">🔊</button>');
+      return;
+    }
+    if (!v.jp || !v.en) { reply('I need the word and its English meaning — or use the one-line form: <b>add vocab 食べる|たべる|to eat|စားသည်| chapter 10</b>'); return; }
+    var vn = Number(v.chapter) || 0;
+    var vItem = { id: uid2(), jp: v.jp, rd: v.rd || '', en: v.en, mm: v.mm || '', cat: 'My words', chapter: vn, chapterTitle: vn ? chTitle(vn) : '' };
+    JL.save('vocab', vItem);
+    reply('✅ Word <b class="jp">' + JL.esc(vItem.jp) + '</b> saved' + (vn ? ' to chapter ' + vn + ' (' + JL.esc(chTitle(vn)) + ')' : ' to your words') +
+      '. See it on the <a href="vocab.html">Vocab page</a> · <a href="edit.html">edit it</a> <button class="btn small ghost" data-say="' + JL.esc(vItem.jp) + '">🔊</button>');
+  }
+
+  function quickAdd(what, rest) {
+    var p = rest.split('|').map(function (x) { return x.trim(); });
+    var chM = p[p.length - 1].match(/chapter\s*(\d+)/i);
+    var ch = chM ? Number(chM[1]) : 0;
+    if (chM) p = p.slice(0, -1);
+    if (what === 'vocab') doAdd('vocab', { jp: p[0], rd: p[1], en: p[2], mm: p[3], chapter: ch });
+    else if (what === 'kanji') doAdd('kanji', { kanji: p[0], on: p[1], kun: p[2], en: p[3], mm: p[4], chapter: ch });
+    else doAdd('sentence', { jp: p[0], rd: p[1], en: p[2], mm: p[3], chapter: ch });
+  }
+
+  function bindForm(root) {
+    Array.prototype.forEach.call(root.querySelectorAll('[data-do]'), function (b) {
+      b.onclick = function () {
+        var box = b.closest('.pf');
+        var g = function (n) {
+          var e = box.querySelector('[data-f="' + n + '"]');
+          return e ? String(e.value || '').trim() : '';
+        };
+        if (b.dataset.do === 'quiz') {
+          var title = g('title');
+          if (!title) { JL.toast('Give the quiz a title first.'); return; }
+          var qch = parseInt(g('chapter'), 10) || 0;
+          var nQ = Math.max(3, Math.min(20, parseInt(g('count'), 10) || 10));
+          var qs = buildQuizQuestions(g('src'), qch, nQ);
+          if (!qs || !qs.length) { reply('Not enough material for that quiz — try another source or chapter.'); return; }
+          JL.save('tests', { id: uid2(), type: 'quiz', title: title, questions: qs, chapter: qch || undefined, chapterTitle: qch ? chTitle(qch) : '' });
+          reply('✅ Quiz <b>' + JL.esc(title) + '</b> saved — ' + qs.length + ' questions' + (qch ? ' from chapter ' + qch + ' (' + JL.esc(chTitle(qch)) + ')' : '') +
+            '. Take it on the <a href="tests.html">Tests page</a> · <a href="edit.html">edit it</a>');
+          return;
+        }
+        doAdd(b.dataset.do, { jp: g('jp'), kanji: g('jp'), rd: g('rd'), on: g('on'), kun: g('kun'), en: g('en'), mm: g('mm'), chapter: parseInt(g('chapter'), 10) || 0 });
+      };
+    });
+  }
 
   function vocabCard(v) {
     return '<div class="jp"><b>' + JL.esc(v.jp) + '</b> (' + JL.esc(v.rd || '') + ')</div>' +
@@ -58,7 +292,7 @@
     function after(html) { reply(html); }
 
     if (ql === 'help' || ql === 'what can you do') {
-      after('I can:<br>• Look up words — “meaning of 食べる” or “tabemono”<br>• Show a kanji — “kanji 雨”<br>• Find grammar — “grammar てください”<br>• Quiz you — “quiz me on kanji / vocab / grammar”<br>• Random study items — “random word” / “random kanji”<br>• Counts — “how many kanji”<br>• List your uploaded files — “my files”<br>For adding, editing or deleting content, open the <a href="edit.html">Add / Edit</a> page.');
+      after('I can:<br>• Look up words — “meaning of 食べる” or “tabemono”<br>• Show a kanji — “kanji 雨”<br>• Find grammar — “grammar てください”<br>• Quiz you — “quiz me on kanji / vocab / grammar”<br>• Random study items — “random word” / “random kanji”<br>• Counts — “how many kanji”<br>• List your uploaded files — “my files”<br>• <b>Add content for you</b> — “add vocab”, “add kanji”, “add sentence”, “add quiz” (I save it to your data, so it shows on the other pages)<br>• Remember our conversation — old chats are in the list at the top');
       return;
     }
     if (ql.indexOf('how many') >= 0) {
@@ -89,7 +323,7 @@
         });
       } else if (kind === 'grammar') {
         JL.data('grammar').forEach(function (g) {
-          (g.ex || []).forEach(function (e) { items.push({ q: e.q || e.s, opts: e.opts, ans: e.ans, note: JL.esc(g.title) }); });
+          ((g.exercises || g.ex) || []).forEach(function (e) { items.push({ q: e.q || e.s, opts: e.opts, ans: e.ans, note: JL.esc(g.title) }); });
         });
         items = JL.pickN(items, 5);
       } else {
@@ -101,15 +335,32 @@
         });
       }
       if (!items.length) { after('No exercises found for that.'); return; }
+      showTyping();
       setTimeout(function () {
-        var holder = bubble('bot', 'Here is a 5-question quiz on ' + kind + '! <div id="pq"></div>');
+        hideTyping();
+        var holder = bubble('bot', 'Here is a 5-question quiz on ' + kind + '! <div id="pq"></div>', { quiz: kind });
         JL.quiz(holder.querySelector('#pq'), items, { title: 'Partner quiz — ' + kind });
         chat.scrollTop = chat.scrollHeight;
-      }, 300);
+      }, 350);
       return;
     }
-    if (/^(edit|add|delete|remove|create|update)/.test(ql)) {
-      after('All editing happens in the <a href="edit.html">Add / Edit</a> page — add and edit vocabulary, kanji and grammar, or build and edit your own quizzes and flashcard decks there.');
+    /* add-commands: create content on the other pages straight from the chat */
+    var am = q.match(/^add\s+([a-z]+)\s*([\s\S]*)$/i) || q.match(/^(?:make|create)\s+(?:me\s+)?(?:a\s+)?(?:quiz|test)\s*([\s\S]*)$/i);
+    if (am) {
+      var what = (am[1] || 'quiz').toLowerCase().replace(/s$/, '');
+      var rest = (am[2] || '').trim();
+      if (what === 'vocabulary') what = 'vocab';
+      if (what === 'listening') what = 'sentence';
+      if (what === 'quiz' || what === 'test') { showQuizForm(rest); return; }
+      if (what === 'vocab' || what === 'kanji' || what === 'sentence') {
+        if (rest.indexOf('|') >= 0) { quickAdd(what, rest); return; }
+        showAddForm(what, rest);
+        return;
+      }
+      if (what === 'grammar') { after('Grammar points have many fields (examples, exercises…) — add them on the <a href="edit.html">Add / Edit → Grammar</a> page.'); return; }
+    }
+    if (/^(edit|delete|remove|update)/.test(ql)) {
+      after('I can <b>add</b> things right here — try “add vocab”, “add kanji”, “add sentence” or “add quiz”. For editing or deleting, use the <a href="edit.html">Add / Edit</a> page.');
       return;
     }
     if (ql.indexOf('my files') >= 0 || ql.indexOf('uploaded') >= 0) {
@@ -168,6 +419,7 @@
     var q = inp.value.trim();
     if (!q) return;
     inp.value = '';
+    if (cur && cur.title === 'New chat') cur.title = q.slice(0, 40);
     bubble('user', JL.esc(q));
     answer(q);
   }
@@ -176,7 +428,46 @@
     if (e.key === 'Enter') send();
   });
 
-  bubble('bot', 'こんにちは！I’m your study partner. Try: <b>meaning of 食べる</b>, <b>kanji 雨</b>, <b>grammar てください</b>, <b>quiz me on kanji</b>, <b>random word</b>, <b>my files</b>, or <b>help</b>.');
+  /* suggestion chips */
+  var SUGGS = ['meaning of 食べる', 'quiz me on vocab', 'add vocab', 'add kanji', 'add sentence', 'add quiz', 'random kanji', 'my files', 'help'];
+  function renderChips() {
+    var box = document.getElementById('p-sugg');
+    box.innerHTML = SUGGS.map(function (s) { return '<button class="sugg" data-s="' + JL.esc(s) + '">' + JL.esc(s) + '</button>'; }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.sugg'), function (b) {
+      b.onclick = function () { document.getElementById('p-in').value = b.dataset.s; send(); };
+    });
+  }
+
+  /* conversation controls */
+  document.getElementById('chat-list').onchange = function () {
+    var v = this.value;
+    var nxt = chats.filter(function (c) { return c.id === v; })[0];
+    if (nxt) { cur = nxt; persistChats(); restore(); }
+  };
+  document.getElementById('chat-new').onclick = function () {
+    cur = { id: 'c' + Date.now(), title: 'New chat', at: Date.now(), msgs: [] };
+    chats.unshift(cur);
+    persistChats();
+    restore();
+    bubble('bot', GREETING);
+  };
+  document.getElementById('chat-del').onclick = function () {
+    if (!confirm('Delete this conversation?')) return;
+    chats = chats.filter(function (c) { return c.id !== cur.id; });
+    if (!chats.length) chats = [{ id: 'c' + Date.now(), title: 'New chat', at: Date.now(), msgs: [] }];
+    cur = chats[0];
+    persistChats();
+    restore();
+    if (!cur.msgs.length) bubble('bot', GREETING);
+  };
+
+  var GREETING = 'こんにちは！I’m your study partner. Try: <b>meaning of 食べる</b>, <b>kanji 雨</b>, <b>quiz me on kanji</b>, <b>add vocab</b>, <b>add quiz</b>, or <b>help</b>. Everything you add here shows up on the other pages.';
+
+  loadChats();
+  renderChatList();
+  restore();
+  renderChips();
+  if (!cur.msgs.length) bubble('bot', GREETING);
 })();
 </script>
 </body>

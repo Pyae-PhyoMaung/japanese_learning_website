@@ -20,7 +20,7 @@
   <h1 class="page-title">🎧 Listening Session</h1>
   <p class="subtitle">Train your ear with words and full sentences using Japanese speech synthesis — replay, slow down, and test yourself with dictation.</p>
 
-  <div class="notice" id="tts-note">Checking Japanese voice…</div>
+  <div class="notice" id="tts-note" hidden>Checking Japanese voice…</div>
 
   <div class="toolbar">
     <label class="f" style="flex-direction:row;align-items:center;gap:8px;flex-basis:100%">🐢 Speed <input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="0.9" style="width:160px"> <b id="rate-val">0.9</b> 🐇</label>
@@ -93,10 +93,13 @@
   /* voice status */
   setTimeout(function () {
     var n = document.getElementById('tts-note');
-    if (!JL.ttsSupported()) { n.textContent = '⚠️ This browser does not support speech synthesis — listening practice needs a modern browser (Chrome, Edge or Safari).'; return; }
+    n.hidden = true;
+    if (!JL.ttsSupported()) { n.textContent = '⚠️ This browser does not support speech synthesis — listening practice needs a modern browser (Chrome, Edge or Safari).'; n.hidden = false; return; }
     var ok = /ja/i.test((window.speechSynthesis.getVoices().map(function (v) { return v.lang; }).join(',')));
-    n.textContent = ok ? '✅ Japanese speech voice detected — audio is ready.' :
-      '⚠️ No Japanese (ja-JP) voice detected yet. Audio may be unavailable until you install a Japanese voice in your system settings. Try clicking a 🔊 button anyway.';
+    if (!ok) {
+      n.textContent = '⚠️ No Japanese (ja-JP) voice detected yet. Audio may be unavailable until you install a Japanese voice in your system settings. Try clicking a 🔊 button anyway.';
+      n.hidden = false;
+    }
   }, 600);
 
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {

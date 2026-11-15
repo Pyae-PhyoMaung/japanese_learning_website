@@ -109,7 +109,7 @@
         var items = rows.filter(function (r) { return r.cat === cat.id; });
         var d = document.createElement('details');
         d.className = 'g-card cat-card';
-        d.open = openCats[cat.id] !== false;
+        d.open = openCats[cat.id] === true;
         d.innerHTML = '<summary><h3 style="display:inline-block">' + cat.icon + ' ' + cat.label + ' <span class="muted small">(' + items.length + ')</span> <span class="muted small">— click to open/close</span></h3></summary>';
         d.addEventListener('toggle', function () {
           openCats[cat.id] = d.open;
