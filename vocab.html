@@ -26,6 +26,7 @@
     <div class="chips" id="cat-chips"></div>
     <div class="toolbar">
       <input type="search" id="v-search" placeholder="Search word, reading or meaning…" style="flex:1;min-width:220px">
+      <a class="btn primary" id="v-learn-sel" href="learn.html">🎯 Learn selected (<span id="v-selcount">0</span>)</a>
       <span class="muted small" id="v-count"></span>
     </div>
     <div class="vocab-grid" id="v-grid"></div>
@@ -69,14 +70,14 @@
 
   var state = { cat: '', q: '' };
 
-  function meaning(v) { return v.en || v.mm || ''; }
+  function meaning(v) { return v.mm || v.en || ''; }
 
   function renderChips(elId) {
     var el = document.getElementById(elId);
     el.innerHTML = '<button class="chip' + (state.cat === '' ? ' active' : '') + '" data-c="">All (' + ALL.length + ')</button>' +
-      cats.map(function (c) {
-        var cnt = ALL.filter(function (v) { return v.cat === c; }).length;
-        return '<button class="chip' + (state.cat === c ? ' active' : '') + '" data-c="' + JL.esc(c) + '">' + JL.esc(c) + ' (' + cnt + ')</button>';
+      JL.chapters('vocab').map(function (c) {
+        var t = c.n ? (c.n + '章 ' + c.t) : c.t;
+        return '<button class="chip' + (state.cat === c.t ? ' active' : '') + '" data-c="' + JL.esc(c.t) + '">' + JL.esc(t) + ' (' + c.count + ')</button>';
       }).join('');
     Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
       b.onclick = function () {
@@ -102,16 +103,33 @@
   function renderGrid() {
     var list = filtered();
     document.getElementById('v-count').textContent = list.length + ' words';
+    var sel = JL.pref('sel_vocab') || [];
     document.getElementById('v-grid').innerHTML = list.map(function (v) {
+      var mm = v.mm || '', en = v.en || '';
       return '<div class="vocab-row"><button class="speak" data-say="' + JL.esc(speakTarget(v)) + '">🔊</button>' +
+        '<input type="checkbox" class="sel-check" data-sel="' + JL.esc(v.id || '') + '"' + (v.id && sel.indexOf(v.id) >= 0 ? ' checked' : '') + ' title="Select for Learn">' +
         '<div><div class="vj jp">' + JL.esc(v.jp) + '</div>' +
-        '<div class="vr jp">' + JL.esc(v.rd || '') + (v.romaji ? ' · ' + JL.esc(v.romaji) : '') + '</div></div>' +
-        '<div class="vm">' + JL.esc(meaning(v)) + '</div>' +
+        '<div class="vr jp">' + JL.esc(v.rd || '') + (v.romaji ? ' · ' + JL.esc(v.romaji) : '') + '</div>' +
+        '<div class="muted small" style="margin-top:2px">' + (v.chapter ? v.chapter + '章 ' + JL.esc(v.chapterTitle || '') : JL.esc(v.cat || '')) + '</div></div>' +
+        '<div class="vm"><span class="jp">' + JL.esc(mm) + '</span>' + (en ? ' <span class="muted small">' + JL.esc(en) + '</span>' : '') + '</div>' +
         '<a class="btn small ghost" href="vocab-draw.html?v=' + encodeURIComponent(v.jp) + '">✏️</a></div>';
     }).join('');
     Array.prototype.forEach.call(document.querySelectorAll('#v-grid [data-say]'), function (b) {
       b.onclick = function () { JL.speak(b.dataset.say); };
     });
+    Array.prototype.forEach.call(document.querySelectorAll('#v-grid .sel-check'), function (cb) {
+      cb.onclick = function (e) { e.stopPropagation(); };
+      cb.onchange = function () {
+        if (!cb.dataset.sel) return;
+        var s = JL.pref('sel_vocab') || [];
+        var i = s.indexOf(cb.dataset.sel);
+        if (cb.checked && i < 0) s.push(cb.dataset.sel);
+        if (!cb.checked && i >= 0) s.splice(i, 1);
+        JL.pref('sel_vocab', s);
+        document.getElementById('v-selcount').textContent = s.length;
+      };
+    });
+    document.getElementById('v-selcount').textContent = sel.length;
   }
 
   document.getElementById('v-search').oninput = function () { state.q = this.value.trim(); renderGrid(); };

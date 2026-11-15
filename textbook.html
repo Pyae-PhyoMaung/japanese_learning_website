@@ -12,9 +12,13 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">📖 Textbook Reader</h1>
-  <p class="subtitle">Read the complete books, page by page. Your last page is remembered for each book.</p>
+  <p class="subtitle">Read the complete books, page by page — a book opens only when you tap its <b>See</b> button. Your last page is remembered for each book.</p>
 
+  <div class="book-grid" id="book-grid"></div>
+
+  <div id="reader" style="display:none">
   <div class="toolbar">
+    <button class="btn ghost" id="back-books">📚 Books</button>
     <select id="book-select"></select>
     <button class="btn" id="pg-first">⏮ First</button>
     <button class="btn" id="pg-prev">← Prev</button>
@@ -31,6 +35,7 @@
 
   <div class="pdf-canvas-wrap" id="pdf-page-wrap"><canvas id="pdf-canvas"></canvas></div>
   <div class="pdf-canvas-wrap" id="pdf-scroll" style="display:none"></div>
+  </div>
 
   <footer class="page-foot">The reader loads PDF.js from a CDN, so an internet connection is required the first time. Books are stored locally in the <code>assets/pdfs</code> folder.</footer>
 </main>
@@ -62,7 +67,38 @@
       o.textContent = '📄 ' + r.name;
       sel.appendChild(o);
     });
+    renderBooks();
   });
+
+  /* books open only on demand — cards with a See button */
+  var ICONS = { minna: 'みん', kanji: '漢' };
+  function renderBooks() {
+    var el = document.getElementById('book-grid');
+    el.innerHTML = BOOKS.map(function (b, i) {
+      var up = String(b.file).slice(0, 4) === 'idb:';
+      return '<div class="book-card"><span class="bk-icon jp">' + (up ? '📄' : (ICONS[b.id] || '📘')) + '</span>' +
+        '<h3>' + JL.esc(b.title) + '</h3>' +
+        '<p>' + (up ? 'Uploaded by you in Files' : 'From the books folder') + '</p>' +
+        '<button class="btn primary" data-see="' + i + '">👀 See</button></div>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('[data-see]'), function (btn) {
+      btn.onclick = function () { openBook(parseInt(btn.dataset.see, 10)); };
+    });
+  }
+  function openBook(i) {
+    currentBook = BOOKS[i]; sel.value = String(i);
+    document.getElementById('reader').style.display = '';
+    document.getElementById('book-grid').style.display = 'none';
+    loadBook();
+    document.getElementById('reader').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  document.getElementById('back-books').onclick = function () {
+    pdfDoc = null;
+    document.getElementById('reader').style.display = 'none';
+    document.getElementById('book-grid').style.display = '';
+    renderBooks();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   function status(msg) { document.getElementById('pdf-status').textContent = msg; }
 
@@ -257,7 +293,7 @@
   });
 
   updateModeUI();
-  loadBook();
+  renderBooks();
 })();
 </script>
 </body>

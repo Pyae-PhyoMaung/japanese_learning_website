@@ -26,6 +26,7 @@
     <div class="chips" id="chapter-chips"></div>
     <div class="toolbar">
       <input type="search" id="k-search" placeholder="Search kanji, readings or meanings…" style="flex:1;min-width:220px">
+      <a class="btn primary" id="k-learn-sel" href="learn.html">🎯 Learn selected (<span id="k-selcount">0</span>)</a>
       <span class="muted small" id="k-count"></span>
     </div>
     <div class="kanji-grid" id="k-grid"></div>
@@ -107,18 +108,35 @@
   function renderGrid() {
     var list = filtered();
     document.getElementById('k-count').textContent = list.length + ' kanji';
+    var sel = JL.pref('sel_kanji') || [];
+    var imgs = JL.pref('kimg') || {};
     document.getElementById('k-grid').innerHTML = list.map(function (k) {
       return '<div class="kanji-card" data-id="' + k.id + '">' +
+        (imgs[k.id] ? '<span class="kimg-badge" title="Has image">📷</span>' : '') +
+        '<input type="checkbox" class="sel-check" data-sel="' + k.id + '"' + (sel.indexOf(k.id) >= 0 ? ' checked' : '') + ' title="Select for Learn">' +
         '<span class="kchar jp">' + JL.esc(k.kanji) + '</span>' +
         '<span class="krd jp">' + JL.esc(kReading(k)) + '</span>' +
         '<span class="kmn">' + JL.esc(k.en || k.meaning || '') + '</span></div>';
     }).join('');
     Array.prototype.forEach.call(document.querySelectorAll('#k-grid .kanji-card'), function (c) {
-      c.onclick = function () {
+      c.onclick = function (e) {
+        if (e.target.classList && e.target.classList.contains('sel-check')) return;
         var k = ALL.find(function (x) { return x.id === c.dataset.id; });
         openDetail(k);
       };
     });
+    Array.prototype.forEach.call(document.querySelectorAll('#k-grid .sel-check'), function (cb) {
+      cb.onclick = function (e) { e.stopPropagation(); };
+      cb.onchange = function () {
+        var s = JL.pref('sel_kanji') || [];
+        var i = s.indexOf(cb.dataset.sel);
+        if (cb.checked && i < 0) s.push(cb.dataset.sel);
+        if (!cb.checked && i >= 0) s.splice(i, 1);
+        JL.pref('sel_kanji', s);
+        document.getElementById('k-selcount').textContent = s.length;
+      };
+    });
+    document.getElementById('k-selcount').textContent = sel.length;
   }
 
   function openDetail(k) {
@@ -137,11 +155,70 @@
       '<div style="text-align:center;margin:6px 0 10px">' +
       '<button class="btn" data-say="' + JL.esc(k.kanji) + '">🔊 Listen to the kanji</button> ' +
       '<a class="btn primary" href="kanji-draw.html?k=' + encodeURIComponent(k.kanji) + '">✍️ Practice writing</a></div>' +
+      '<div class="img-box" id="k-img-box"></div>' +
       (ex ? '<h4>Example words</h4>' + ex : '');
     Array.prototype.forEach.call(document.querySelectorAll('#k-modal-body [data-say]'), function (b) {
       b.onclick = function () { JL.speak(b.dataset.say); };
     });
+    renderImgBox(k);
     document.getElementById('k-modal').classList.remove('hidden');
+  }
+
+  /* per-kanji memory image: upload, pick from files, change, remove */
+  function renderImgBox(k) {
+    var box = document.getElementById('k-img-box');
+    if (!box) return;
+    var fid = JL.kimg.get(k.id);
+    if (fid) {
+      box.innerHTML = '<img id="k-img-el" alt="memory image">' +
+        '<div class="fc-actions" style="margin-top:8px">' +
+        '<button class="btn small" id="k-img-chg">🔄 Change image</button> ' +
+        '<button class="btn small ghost" id="k-img-del">🗑 Remove</button></div>';
+      document.getElementById('k-img-chg').onclick = function () { pickFile(k); };
+      document.getElementById('k-img-del').onclick = function () { JL.kimg.set(k.id, null); renderImgBox(k); renderGrid(); JL.toast('Image removed.'); };
+      JL.files.get(fid).then(function (rec) {
+        var el = document.getElementById('k-img-el');
+        if (el && rec && rec.blob) el.src = URL.createObjectURL(rec.blob);
+      }).catch(function () {});
+    } else {
+      box.innerHTML = '<div class="fc-actions">' +
+        '<button class="btn small primary" id="k-img-up">⬆️ Upload image</button> ' +
+        '<button class="btn small" id="k-img-pick">🗂️ Pick from my files</button></div>' +
+        '<p class="muted small" style="margin:4px 0 0">Add a picture that helps you remember this kanji (like the pictures in the N5 / N4 kanji books).</p>';
+      document.getElementById('k-img-up').onclick = function () { pickFile(k); };
+      document.getElementById('k-img-pick').onclick = function () { pickExisting(k); };
+    }
+  }
+  function pickFile(k) {
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.onchange = function () {
+      var f = inp.files[0];
+      if (!f) return;
+      var ext = (f.name.split('.').pop() || 'png').toLowerCase();
+      var meta = { id: 'f_kimg_' + k.id + '_' + Date.now(), cat: 'image', name: 'kanji_' + k.kanji + '.' + ext, type: f.type, size: f.size, added: new Date().toISOString().slice(0, 10) };
+      JL.files.put(meta, f).then(function (m) {
+        JL.kimg.set(k.id, m.id);
+        renderImgBox(k); renderGrid();
+        JL.toast('Image attached ✅');
+      }).catch(function () { JL.toast('Upload failed.'); });
+    };
+    inp.click();
+  }
+  function pickExisting(k) {
+    JL.files.list().then(function (all) {
+      var imgs = all.filter(function (m) { return m.cat === 'image'; });
+      var box = document.getElementById('k-img-box');
+      if (!imgs.length) { JL.toast('No images in your files yet — upload one instead.'); return; }
+      box.innerHTML = '<h4 style="margin:8px 0">Pick an image from your files</h4>' +
+        imgs.map(function (m) { return '<button class="btn small ghost" data-pick="' + JL.esc(m.id) + '">' + JL.esc(m.name || m.id) + '</button>'; }).join(' ') +
+        '<div style="margin-top:8px"><button class="btn small" id="k-img-back">↩ Back</button></div>';
+      Array.prototype.forEach.call(box.querySelectorAll('[data-pick]'), function (b) {
+        b.onclick = function () { JL.kimg.set(k.id, b.dataset.pick); renderImgBox(k); renderGrid(); JL.toast('Image attached ✅'); };
+      });
+      document.getElementById('k-img-back').onclick = function () { renderImgBox(k); };
+    });
   }
   document.getElementById('k-modal-close').onclick = function () { document.getElementById('k-modal').classList.add('hidden'); };
   document.getElementById('k-modal').onclick = function (e) {

@@ -33,6 +33,7 @@
         <label class="f">English meaning <input type="text" id="v-en" placeholder="boxed lunch"></label>
         <label class="f">Burmese meaning <input type="text" id="v-mm" placeholder="ထမင်းထုပ်"></label>
         <label class="f">Category <input type="text" id="v-cat" placeholder="My words"></label>
+        <label class="f">Chapter (book chapters) <select id="v-chapter"><option value="">— keep category —</option></select></label>
       </div>
       <button class="btn primary" id="v-save">💾 Save word</button>
       <button class="btn ghost" id="v-new">✨ New / clear</button>
@@ -51,6 +52,7 @@
         <label class="f">Title <input type="text" id="gr-title" placeholder="〜てください"></label>
         <label class="f">Pattern <input type="text" id="gr-pattern" placeholder="〜てください"></label>
         <label class="f">Meaning <input type="text" id="gr-meaning" placeholder="please do…"></label>
+        <label class="f">Burmese meaning <input type="text" id="gr-mm" placeholder="…လုပ်ပေးပါ"></label>
       </div>
       <label class="f" style="margin-top:8px">Explanation <textarea id="gr-expl" rows="2" style="width:100%"></textarea></label>
       <h4>Examples</h4><div class="dyn-rows" id="gr-examples"></div>
@@ -176,9 +178,9 @@
     }).slice(0, 400);
     document.getElementById('v-list-count').textContent = all.length + ' words total (showing ' + items.length + ')';
     var el = document.getElementById('v-list');
-    el.innerHTML = '<table class="list"><tr><th>Japanese</th><th>Reading</th><th>Meaning</th><th>Category</th><th></th></tr>' +
+        el.innerHTML = '<table class="list"><tr><th>Japanese</th><th>Reading</th><th>Meaning</th><th>Category</th><th></th></tr>' +
       items.map(function (v) {
-        return '<tr><td class="jp"><b>' + JL.esc(v.jp) + '</b></td><td class="jp">' + JL.esc(v.rd || '') + '</td><td>' + JL.esc(v.en || v.mm || '') + '</td><td class="muted">' + JL.esc(v.cat || '') + '</td>' +
+        return '<tr><td class="jp"><b>' + JL.esc(v.jp) + '</b></td><td class="jp">' + JL.esc(v.rd || '') + '</td><td><span class="jp">' + JL.esc(v.mm || v.en || '') + '</span></td><td class="muted">' + (v.chapter ? v.chapter + '章 ' : '') + JL.esc(v.cat || '') + '</td>' +
           '<td><button class="btn small" data-edit="' + v.id + '">✏️</button> <button class="btn small ghost" data-del="' + v.id + '">🗑</button></td></tr>';
       }).join('') + '</table>';
     Array.prototype.forEach.call(el.querySelectorAll('[data-edit]'), function (b) {
@@ -189,6 +191,7 @@
         document.getElementById('v-jp').value = v.jp || ''; document.getElementById('v-rd').value = v.rd || '';
         document.getElementById('v-ro').value = v.romaji || ''; document.getElementById('v-en').value = v.en || '';
         document.getElementById('v-mm').value = v.mm || ''; document.getElementById('v-cat').value = v.cat || '';
+        document.getElementById('v-chapter').value = String(v.chapter || 0);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
     });
@@ -210,6 +213,15 @@
     item.en = document.getElementById('v-en').value.trim();
     item.mm = document.getElementById('v-mm').value.trim();
     item.cat = document.getElementById('v-cat').value.trim() || 'My words';
+    var chSel = document.getElementById('v-chapter').value;
+    if (chSel !== '') {
+      var ch = JL.chapters('vocab').filter(function (c) { return String(c.n) === chSel; })[0];
+      if (ch) { item.cat = ch.t; item.chapter = ch.n; item.chapterTitle = ch.t; }
+    } else {
+      var ch2 = JL.chapters('vocab').filter(function (c) { return c.t === item.cat && c.n > 0; })[0];
+      item.chapter = ch2 ? ch2.n : 0;
+      item.chapterTitle = ch2 ? ch2.t : item.cat;
+    }
     JL.save('vocab', item);
     document.getElementById('v-msg').textContent = '✓ Saved!';
     editV = null;
@@ -221,8 +233,18 @@
   document.getElementById('v-new').onclick = function () {
     editV = null;
     ['v-jp', 'v-rd', 'v-ro', 'v-en', 'v-mm'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('v-chapter').value = '';
     document.getElementById('vocab-form-title').textContent = '➕ Add vocabulary';
   };
+
+  /* fill the chapter selector from the book chapters */
+  (function fillChapters() {
+    var sel = document.getElementById('v-chapter');
+    var chs = JL.chapters('vocab').filter(function (c) { return c.n > 0; });
+    sel.innerHTML = '<option value="">— keep category —</option>' +
+      '<option value="0">Essential / my words</option>' +
+      chs.map(function (c) { return '<option value="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + '</option>'; }).join('');
+  })();
 
   /* ============ GRAMMAR ============ */
   var editG = null;
@@ -250,6 +272,7 @@
         document.getElementById('gr-title').value = g.title || '';
         document.getElementById('gr-pattern').value = g.pattern || '';
         document.getElementById('gr-meaning').value = g.meaning || '';
+        document.getElementById('gr-mm').value = g.mm || '';
         document.getElementById('gr-expl').value = g.explanation || '';
         document.getElementById('gr-examples').innerHTML = '';
         (g.examples || []).forEach(function (e) {
@@ -276,9 +299,12 @@
     if (!title) { document.getElementById('gr-msg').textContent = 'Title is required.'; return; }
     var item = editG || { id: uid() };
     item.lesson = parseInt(document.getElementById('gr-lesson').value, 10) || 1;
+    item.chapter = item.lesson;
+    item.chapterTitle = 'Lesson ' + item.lesson;
     item.title = title;
     item.pattern = document.getElementById('gr-pattern').value.trim();
     item.meaning = document.getElementById('gr-meaning').value.trim();
+    item.mm = document.getElementById('gr-mm').value.trim();
     item.explanation = document.getElementById('gr-expl').value.trim();
     item.examples = readRows(document.getElementById('gr-examples')).filter(function (r) { return r[0]; })
       .map(function (r) { return { jp: r[0], rd: r[1], en: r[2] }; });
@@ -293,7 +319,7 @@
     editG = null;
     document.getElementById('g-form-title').textContent = '➕ Add grammar point';
     document.getElementById('gr-title').value = ''; document.getElementById('gr-pattern').value = '';
-    document.getElementById('gr-meaning').value = ''; document.getElementById('gr-expl').value = '';
+    document.getElementById('gr-meaning').value = ''; document.getElementById('gr-mm').value = ''; document.getElementById('gr-expl').value = '';
     document.getElementById('gr-examples').innerHTML = '';
     document.getElementById('gr-exercises').innerHTML = '';
     rowsHtml(document.getElementById('gr-examples'), EXF);

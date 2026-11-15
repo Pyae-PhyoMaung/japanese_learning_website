@@ -21,6 +21,7 @@
     <button class="btn primary" id="g-practice-all">📝 Practice all exercises</button>
   </div>
 
+  <div class="chips" id="lesson-chips"></div>
   <div id="g-list"></div>
 
   <!-- exercise modal -->
@@ -41,12 +42,24 @@
 (function () {
   var ALL = JL.data('grammar');
   JL.ttsBanner('tts-banner');
-  var q = '';
+  var q = '', lesson = 0;
+
+  function renderChips() {
+    var el = document.getElementById('lesson-chips');
+    el.innerHTML = '<button class="chip' + (lesson === 0 ? ' active' : '') + '" data-n="0">All lessons (' + ALL.length + ')</button>' +
+      JL.chapters('grammar').map(function (c) {
+        return '<button class="chip' + (lesson === c.n ? ' active' : '') + '" data-n="' + c.n + '">L' + c.n + ' (' + c.count + ')</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { lesson = parseInt(b.dataset.n, 10); renderChips(); render(); };
+    });
+  }
 
   function render() {
     var list = ALL.filter(function (g) {
+      if (lesson && (g.lesson || 0) !== lesson) return false;
       if (!q) return true;
-      var hay = [g.title, g.pattern, g.meaning, g.explanation, String(g.lesson)].join(' ').toLowerCase();
+      var hay = [g.title, g.pattern, g.meaning, g.explanation, String(g.lesson), g.mm].join(' ').toLowerCase();
       return hay.indexOf(q.toLowerCase()) >= 0;
     }).sort(function (a, b) { return (a.lesson || 0) - (b.lesson || 0); });
 
@@ -60,7 +73,7 @@
       return '<div class="g-card" data-id="' + g.id + '">' +
         '<h3>' + JL.esc(g.title) + ' <span class="muted small">· Lesson ' + (g.lesson || '–') + '</span></h3>' +
         '<span class="pattern jp">' + JL.esc(g.pattern) + '</span>' +
-        '<div class="meaning">' + JL.esc(g.meaning) + '</div>' +
+        '<div class="meaning">' + JL.esc(g.meaning) + (g.mm ? ' · <span class="jp">' + JL.esc(g.mm) + '</span>' : '') + '</div>' +
         '<p>' + JL.esc(g.explanation || '') + '</p>' +
         (ex ? '<div>' + ex + '</div>' : '') +
         ((g.exercises || []).length ? '<button class="btn primary g-ex">Exercise (' + g.exercises.length + ') →</button>' : '') +
@@ -108,6 +121,7 @@
     JL.quiz(area, all, { title: 'Mixed grammar practice' });
   };
 
+  renderChips();
   render();
 })();
 </script>

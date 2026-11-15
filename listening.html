@@ -120,7 +120,7 @@
   document.getElementById('s-slow').onclick = function () { JL.speak(s ? s.jp : '', 0.55); };
   document.getElementById('s-reveal').onclick = function () {
     document.getElementById('s-reveal-box').innerHTML =
-      '<b>' + JL.esc(s.jp) + '</b><br><span class="muted">' + JL.esc(s.rd || '') + '</span><br>' + JL.esc(s.en || '');
+      '<b>' + JL.esc(s.jp) + '</b><br><span class="muted">' + JL.esc(s.rd || '') + '</span><br>' + JL.esc(s.en || '') + (s.mm ? '<br><span class="jp">' + JL.esc(s.mm) + '</span>' : '');
   };
   document.getElementById('s-next').onclick = nextSent;
 
@@ -146,13 +146,13 @@
       res.innerHTML = '<b class="ok">✓ 正解！ Correct!</b><br><span class="jp">' + JL.esc(d.jp) + '</span> (' + JL.esc(d.rd || '') + ')';
     } else {
       res.innerHTML = '<b class="err">✗ Not quite — you typed:</b> <span class="jp">' + JL.esc(document.getElementById('d-input').value) + '</span><br>' +
-        '<b class="ok">Answer:</b> <span class="jp">' + JL.esc(d.rd || d.jp) + '</span><br>' + JL.esc(d.en || '');
+        '<b class="ok">Answer:</b> <span class="jp">' + JL.esc(d.rd || d.jp) + '</span><br>' + JL.esc(d.en || '') + (d.mm ? '<br><span class="jp">' + JL.esc(d.mm) + '</span>' : '');
     }
   };
   document.getElementById('d-answer').onclick = function () {
     if (!d) return;
     document.getElementById('d-result').innerHTML =
-      '<b class="ok">Answer:</b> <span class="jp">' + JL.esc(d.rd || d.jp) + '</span><br><span class="jp">' + JL.esc(d.jp) + '</span> — ' + JL.esc(d.en || '');
+      '<b class="ok">Answer:</b> <span class="jp">' + JL.esc(d.rd || d.jp) + '</span><br><span class="jp">' + JL.esc(d.jp) + '</span> — ' + JL.esc(d.en || '') + (d.mm ? ' — <span class="jp">' + JL.esc(d.mm) + '</span>' : '');
   };
   document.getElementById('d-next').onclick = nextD;
   document.getElementById('d-input').addEventListener('keydown', function (e) {

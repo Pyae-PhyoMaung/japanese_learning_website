@@ -276,10 +276,13 @@ window.JL = (function () {
   var NAV = [
     { href: 'index.html', icon: '🏠', label: 'Home' },
     { href: 'textbook.html', icon: '📖', label: 'Textbook' },
+    { href: 'learn.html', icon: '🎯', label: 'Learn' },
     { href: 'kanji.html', icon: '漢', label: 'Kanji' },
     { href: 'kanji-draw.html', icon: '✍️', label: 'Write Kanji' },
     { href: 'vocab.html', icon: '語', label: 'Vocabulary' },
     { href: 'vocab-draw.html', icon: '✏️', label: 'Write Vocab' },
+    { href: 'hiragana.html', icon: 'あ', label: 'Hiragana' },
+    { href: 'katakana.html', icon: 'ア', label: 'Katakana' },
     { href: 'grammar.html', icon: '文', label: 'Grammar' },
     { href: 'listening.html', icon: '🎧', label: 'Listening' },
     { href: 'tests.html', icon: '📝', label: 'Tests' },
@@ -662,6 +665,26 @@ window.JL = (function () {
     });
   }
 
+  /* ---------- chapter list helper ---------- */
+  function chapters(kind) {
+    var seen = {}, out = [];
+    merged(kind).forEach(function (it) {
+      var n = (it.chapter != null) ? it.chapter : 0;
+      if (!seen[n]) { seen[n] = { n: n, t: it.chapterTitle || ('Lesson ' + n), count: 0 }; out.push(seen[n]); }
+      seen[n].count++;
+    });
+    out.sort(function (a, b) { return a.n - b.n; });
+    return out;
+  }
+
+  /* ---------- per-kanji memorization images (cloud-synced mapping kanjiId -> fileId) ---------- */
+  function kimgGet(kanjiId) { return (pref('kimg') || {})[kanjiId] || null; }
+  function kimgSet(kanjiId, fileId) {
+    var m = pref('kimg') || {};
+    if (fileId) m[kanjiId] = fileId; else delete m[kanjiId];
+    pref('kimg', m);
+  }
+
   /* ---------- public API ---------- */
   return {
     data: merged, save: save, remove: remove, restore: restore,
@@ -670,7 +693,7 @@ window.JL = (function () {
     quiz: quiz, flashcards: flashcards, pad: pad,
     files: { list: filesList, put: filePut, get: fileGet, del: fileDel, cat: fileCat },
     sync: { push: pushUserData, pull: pullUserData, live: startLiveSync },
-    pref: pref
+    pref: pref, chapters: chapters, kimg: { get: kimgGet, set: kimgSet }
   };
 })();
 document.addEventListener('DOMContentLoaded', function () { JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.sync.pull(); JL.sync.live(); });

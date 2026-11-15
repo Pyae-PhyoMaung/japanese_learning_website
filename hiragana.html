@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hiragana | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">あ</span><span class="brand-title">Hiragana — Reading &amp; Writing</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">あ Hiragana</h1>
+  <p class="subtitle">All 46 basic hiragana, plus dakuten/handakuten and combined sounds. Tap a kana to load it on the writing grid, or use ← Prev / Next → to practice in order.</p>
+
+  <div class="chips" id="kana-chips"></div>
+  <div class="kana-grid" id="kana-grid"></div>
+
+  <div class="draw-wrap" style="margin-top:26px">
+    <div class="pad-box">
+      <canvas id="guide-canvas"></canvas>
+      <canvas id="draw-canvas"></canvas>
+    </div>
+    <div class="draw-info">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span class="big-char jp" id="cur-kana">あ</span>
+        <div>
+          <div class="jp" id="cur-row">あ行</div>
+          <div class="muted" id="cur-ro">a</div>
+        </div>
+        <button class="btn" id="say-cur">🔊 Listen</button>
+      </div>
+      <div class="toolbar" style="margin-top:14px">
+        <button class="btn" id="d-prev">← Prev</button>
+        <button class="btn" id="d-next">Next →</button>
+        <button class="btn" id="d-clear">🧹 Clear</button>
+        <button class="btn" id="d-undo">↩ Undo stroke</button>
+        <button class="btn ghost" id="d-guide">👁 Hide guide</button>
+      </div>
+      <p class="muted small" id="progress"></p>
+    </div>
+  </div>
+
+  <footer class="page-foot">Draw with your mouse, finger or stylus. The light-gray character is your tracing guide — hide it to test yourself.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var ROWS = [
+    ['あ行', 'あいうえお', 'a i u e o'],
+    ['か行', 'かきくけこ', 'ka ki ku ke ko'],
+    ['さ行', 'さしすせそ', 'sa shi su se so'],
+    ['た行', 'たちつてと', 'ta chi tsu te to'],
+    ['な行', 'なにぬねの', 'na ni nu ne no'],
+    ['は行', 'はひふへほ', 'ha hi fu he ho'],
+    ['ま行', 'まみむめも', 'ma mi mu me mo'],
+    ['や行', 'やゆよ', 'ya yu yo'],
+    ['ら行', 'らりるれろ', 'ra ri ru re ro'],
+    ['わ行', 'わをん', 'wa wo n'],
+    ['が行', 'がぎぐげご', 'ga gi gu ge go'],
+    ['ざ行', 'ざじずぜぞ', 'za ji zu ze zo'],
+    ['だ行', 'だぢづでど', 'da ji zu de do'],
+    ['ば行', 'ばびぶべぼ', 'ba bi bu be bo'],
+    ['ぱ行', 'ぱぴぷぺぽ', 'pa pi pu pe po'],
+    ['拗音', 'きゃきゅきょしゃしゅしょちゃちゅちょにゃにゅにょひゃひゅひょみゃみゅみょりゃりゅりょぎゃぎゅぎょじゃじゅじょびゃびゅびょぴゃぴゅぴょ',
+     'kya kyu kyo sha shu sho cha chu cho nya nyu nyo hya hyu hyo mya myu myo rya ryu ryo gya gyu gyo ja ju jo bya byu byo pya pyu pyo']
+  ];
+  var KANA = [];
+  ROWS.forEach(function (row) {
+    var chars = row[1].split('');
+    var roms = row[2].split(' ');
+    chars.forEach(function (c, i) { KANA.push({ c: c, r: roms[i] || '', row: row[0] }); });
+  });
+
+  var filter = 'all';
+  var idx = 0, showGuide = true;
+  var pad = JL.pad('draw-canvas', 'guide-canvas');
+
+  function chips() {
+    var el = document.getElementById('kana-chips');
+    el.innerHTML = '<button class="chip' + (filter === 'all' ? ' active' : '') + '" data-f="all">All (' + KANA.length + ')</button>' +
+      ROWS.map(function (r) {
+        return '<button class="chip' + (filter === r[0] ? ' active' : '') + '" data-f="' + r[0] + '">' + r[0] + '</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { filter = b.dataset.f; idx = 0; chips(); grid(); render(); };
+    });
+  }
+
+  function list() { return filter === 'all' ? KANA : KANA.filter(function (k) { return k.row === filter; }); }
+
+  function grid() {
+    var el = document.getElementById('kana-grid');
+    var L = list();
+    el.innerHTML = L.map(function (k, i) {
+      return '<div class="kana-card' + (i === idx ? ' active' : '') + '" data-i="' + i + '"><span class="ka-char jp">' + JL.esc(k.c) + '</span><span class="ka-ro">' + JL.esc(k.r) + '</span></div>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.kana-card'), function (c) {
+      c.onclick = function () { idx = parseInt(c.dataset.i, 10); grid(); render(); };
+    });
+  }
+
+  function render() {
+    var L = list();
+    if (!L.length) return;
+    idx = Math.min(idx, L.length - 1);
+    var k = L[idx];
+    document.getElementById('cur-kana').textContent = k.c;
+    document.getElementById('cur-row').textContent = k.row;
+    document.getElementById('cur-ro').textContent = k.r;
+    document.getElementById('progress').textContent = 'Kana ' + (idx + 1) + ' of ' + L.length;
+    document.getElementById('say-cur').onclick = function () { JL.speak(k.c); };
+    pad.setGuide(k.c, showGuide);
+    pad.clear();
+  }
+
+  document.getElementById('d-prev').onclick = function () { var L = list(); idx = (idx - 1 + L.length) % L.length; grid(); render(); };
+  document.getElementById('d-next').onclick = function () { var L = list(); idx = (idx + 1) % L.length; grid(); render(); };
+  document.getElementById('d-clear').onclick = function () { pad.clear(); };
+  document.getElementById('d-undo').onclick = function () { pad.undo(); };
+  document.getElementById('d-guide').onclick = function () {
+    showGuide = !showGuide;
+    this.textContent = showGuide ? '👁 Hide guide' : '👁 Show guide';
+    pad.setGuide(list()[idx] ? list()[idx].c : '', showGuide);
+  };
+
+  chips(); grid(); render();
+})();
+</script>
+</body>
+</html>
