@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Writing Practice | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">書</span><span class="brand-title">Writing Practice — Kanji &amp; Vocabulary</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">✍️ Writing Practice</h1>
+  <p class="subtitle">Practice writing kanji and whole words by hand on the guided grid — pick a chapter and work through it, or search for any kanji or word. Trace the light-gray guide, or hide it to test yourself.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="kanji">漢 Kanji</button>
+    <button class="tab" data-tab="vocab">語 Vocabulary</button>
+  </div>
+
+  <div id="panel-kanji" class="tab-panel active">
+    <div class="chips" id="k-chapters"></div>
+    <div class="draw-wrap">
+      <div class="pad-box">
+        <canvas id="guide-canvas"></canvas>
+        <canvas id="draw-canvas"></canvas>
+      </div>
+      <div class="draw-info">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span class="big-char jp" id="k-cur">—</span>
+          <div>
+            <div class="jp" id="k-reading"></div>
+            <div class="muted" id="k-meaning"></div>
+          </div>
+          <button class="btn" id="k-say">🔊 Listen</button>
+        </div>
+        <div class="toolbar" style="margin-top:14px">
+          <button class="btn" id="k-prev">← Prev</button>
+          <button class="btn" id="k-next">Next →</button>
+          <button class="btn" id="k-clear">🧹 Clear</button>
+          <button class="btn" id="k-undo">↩ Undo stroke</button>
+          <button class="btn ghost" id="k-guide">👁 Hide guide</button>
+        </div>
+        <div class="toolbar">
+          <input type="search" id="k-search" placeholder="Search kanji, reading or meaning…" style="flex:1;min-width:200px">
+        </div>
+        <div class="char-pick" id="k-results"></div>
+        <p class="muted small" id="k-progress"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-vocab" class="tab-panel">
+    <div class="chips" id="v-chapters"></div>
+    <div class="draw-wrap">
+      <div class="pad-box">
+        <canvas id="guide-canvas2"></canvas>
+        <canvas id="draw-canvas2"></canvas>
+      </div>
+      <div class="draw-info">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span class="big-char jp" id="v-cur">—</span>
+          <div>
+            <div class="jp" id="v-reading"></div>
+            <div class="muted" id="v-meaning"></div>
+          </div>
+          <button class="btn" id="v-say">🔊 Listen</button>
+        </div>
+        <p class="muted small">Characters in this word — tap to practice one:</p>
+        <div class="char-pick" id="v-chars"></div>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn" id="v-prev">← Prev word</button>
+          <button class="btn" id="v-next">Next word →</button>
+          <button class="btn" id="v-clear">🧹 Clear</button>
+          <button class="btn" id="v-undo">↩ Undo stroke</button>
+          <button class="btn ghost" id="v-guide">👁 Hide guide</button>
+        </div>
+        <div class="toolbar">
+          <input type="search" id="v-search" placeholder="Search word, reading or meaning…" style="flex:1;min-width:200px">
+        </div>
+        <div class="char-pick" id="v-results"></div>
+        <p class="muted small" id="v-progress"></p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="page-foot">Draw with your mouse, finger or stylus. Writing by hand is one of the best ways to remember kanji and words.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var KANJI = JL.data('kanji'), VOCAB = JL.data('vocab').filter(function (v) { return v.jp; });
+  var padK = JL.pad('draw-canvas', 'guide-canvas');
+  var padV = JL.pad('draw-canvas2', 'guide-canvas2');
+
+  /* ---------------- kanji tab ---------------- */
+  var kCh = 0, kIdx = 0, kGuide = true;
+  function kList() { return kCh ? KANJI.filter(function (k) { return k.chapter === kCh; }) : KANJI; }
+  function kChapters() {
+    var el = document.getElementById('k-chapters');
+    el.innerHTML = '<button class="chip' + (kCh === 0 ? ' active' : '') + '" data-n="0">All (' + KANJI.length + ')</button>' +
+      JL.chapters('kanji').map(function (c) {
+        return '<button class="chip' + (kCh === c.n ? ' active' : '') + '" data-n="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + ' (' + c.count + ')</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { kCh = parseInt(b.dataset.n, 10); kIdx = 0; kChapters(); kRender(); };
+    });
+  }
+  function kRender() {
+    var L = kList();
+    if (!L.length) return;
+    kIdx = Math.min(kIdx, L.length - 1);
+    var k = L[kIdx];
+    document.getElementById('k-cur').textContent = k.kanji;
+    document.getElementById('k-reading').textContent = (k.on || []).join(' · ') + ' / ' + (k.kun || '—');
+    document.getElementById('k-meaning').textContent = (k.en || '') + (k.meaning ? ' · ' + k.meaning : '');
+    document.getElementById('k-progress').textContent = (kCh ? 'Ch ' + kCh + ' — ' : '') + 'Kanji ' + (kIdx + 1) + ' of ' + L.length;
+    document.getElementById('k-say').onclick = function () { JL.speak(k.kanji); };
+    padK.setGuide(k.kanji, kGuide);
+    padK.clear();
+  }
+  document.getElementById('k-prev').onclick = function () { var L = kList(); kIdx = (kIdx - 1 + L.length) % L.length; kRender(); };
+  document.getElementById('k-next').onclick = function () { var L = kList(); kIdx = (kIdx + 1) % L.length; kRender(); };
+  document.getElementById('k-clear').onclick = function () { padK.clear(); };
+  document.getElementById('k-undo').onclick = function () { padK.undo(); };
+  document.getElementById('k-guide').onclick = function () {
+    kGuide = !kGuide;
+    this.textContent = kGuide ? '👁 Hide guide' : '👁 Show guide';
+    padK.setGuide(kList()[kIdx] ? kList()[kIdx].kanji : '', kGuide);
+  };
+  document.getElementById('k-search').oninput = function () {
+    var q = this.value.trim().toLowerCase();
+    var box = document.getElementById('k-results');
+    if (!q) { box.innerHTML = ''; return; }
+    var hits = KANJI.filter(function (k) {
+      return [k.kanji, (k.on || []).join(' '), k.kun, k.en, k.meaning].join(' ').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 10);
+    box.innerHTML = hits.length ? hits.map(function (k) {
+      return '<button class="btn small ghost jp" data-kk="' + JL.esc(k.kanji) + '">' + JL.esc(k.kanji) + '</button>';
+    }).join(' ') : '<span class="muted small">No matches.</span>';
+    Array.prototype.forEach.call(box.querySelectorAll('[data-kk]'), function (b) {
+      b.onclick = function () {
+        var i = KANJI.findIndex(function (k) { return k.kanji === b.dataset.kk; });
+        if (i >= 0) { kCh = 0; kIdx = i; kChapters(); kRender(); box.innerHTML = ''; document.getElementById('k-search').value = ''; }
+      };
+    });
+  };
+
+  /* ---------------- vocab tab ---------------- */
+  var vCh = '__all__', vIdx = 0, vGuide = true, vChar = null;
+  function vList() {
+    return vCh === '__all__' ? VOCAB : VOCAB.filter(function (v) {
+      return vCh === '__essential__' ? !v.chapter : v.cat === vCh;
+    });
+  }
+  function vChapters() {
+    var el = document.getElementById('v-chapters');
+    var nEss = VOCAB.filter(function (v) { return !v.chapter; }).length;
+    el.innerHTML = '<button class="chip' + (vCh === '__all__' ? ' active' : '') + '" data-c="__all__">All (' + VOCAB.length + ')</button>' +
+      '<button class="chip' + (vCh === '__essential__' ? ' active' : '') + '" data-c="__essential__">★ Essential (' + nEss + ')</button>' +
+      JL.chapters('vocab').filter(function (c) { return c.n > 0; }).map(function (c) {
+        return '<button class="chip' + (vCh === c.t ? ' active' : '') + '" data-c="' + JL.esc(c.t) + '">' + c.n + '章 ' + JL.esc(c.t) + ' (' + c.count + ')</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { vCh = b.dataset.c; vIdx = 0; vChar = null; vChapters(); vRender(); };
+    });
+  }
+  function vChars(v) {
+    return String(v.jp).split('').filter(function (ch) { return /\S/.test(ch); });
+  }
+  function vRender() {
+    var L = vList();
+    if (!L.length) return;
+    vIdx = Math.min(vIdx, L.length - 1);
+    var v = L[vIdx];
+    document.getElementById('v-cur').textContent = v.jp;
+    document.getElementById('v-reading').textContent = v.rd || '';
+    document.getElementById('v-meaning').textContent = (v.mm || '') + (v.en ? ' · ' + v.en : '');
+    document.getElementById('v-progress').textContent = 'Word ' + (vIdx + 1) + ' of ' + L.length;
+    document.getElementById('v-say').onclick = function () { JL.speak(v.jp); };
+    var cs = vChars(v);
+    if (vChar === null || cs.indexOf(vChar) < 0) vChar = cs[0];
+    document.getElementById('v-chars').innerHTML = cs.map(function (ch) {
+      return '<button class="jp' + (ch === vChar ? ' active' : '') + '" data-ch="' + JL.esc(ch) + '">' + JL.esc(ch) + '</button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#v-chars button'), function (b) {
+      b.onclick = function () { vChar = b.dataset.ch; vRender(); };
+    });
+    padV.setGuide(vChar, vGuide);
+    padV.clear();
+  }
+  document.getElementById('v-prev').onclick = function () { var L = vList(); vIdx = (vIdx - 1 + L.length) % L.length; vChar = null; vRender(); };
+  document.getElementById('v-next').onclick = function () { var L = vList(); vIdx = (vIdx + 1) % L.length; vChar = null; vRender(); };
+  document.getElementById('v-clear').onclick = function () { padV.clear(); };
+  document.getElementById('v-undo').onclick = function () { padV.undo(); };
+  document.getElementById('v-guide').onclick = function () {
+    vGuide = !vGuide;
+    this.textContent = vGuide ? '👁 Hide guide' : '👁 Show guide';
+    padV.setGuide(vChar || '', vGuide);
+  };
+  document.getElementById('v-search').oninput = function () {
+    var q = this.value.trim().toLowerCase();
+    var box = document.getElementById('v-results');
+    if (!q) { box.innerHTML = ''; return; }
+    var hits = VOCAB.filter(function (v) {
+      return [v.jp, v.rd, v.romaji, v.en, v.mm].join(' ').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 8);
+    box.innerHTML = hits.length ? hits.map(function (v) {
+      return '<button class="btn small ghost jp" data-vv="' + JL.esc(v.jp) + '">' + JL.esc(v.jp) + ' <span class="muted">' + JL.esc(v.rd || '') + '</span></button>';
+    }).join(' ') : '<span class="muted small">No matches.</span>';
+    Array.prototype.forEach.call(box.querySelectorAll('[data-vv]'), function (b) {
+      b.onclick = function () {
+        var i = VOCAB.findIndex(function (v) { return v.jp === b.dataset.vv; });
+        if (i >= 0) { vCh = '__all__'; vIdx = i; vChar = null; vChapters(); vRender(); box.innerHTML = ''; document.getElementById('v-search').value = ''; }
+      };
+    });
+  };
+
+  /* ---------------- tabs & deep links ---------------- */
+  function setTab(t) {
+    document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+    document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
+    document.querySelector('.tab[data-tab="' + t + '"]').classList.add('active');
+    document.getElementById('panel-' + t).classList.add('active');
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.onclick = function () { setTab(t.dataset.tab); };
+  });
+
+  var mK = location.search.match(/[?&]k=([^&]+)/);
+  var mV = location.search.match(/[?&]v=([^&]+)/);
+  var mT = location.search.match(/[?&]tab=(kanji|vocab)/);
+  if (mV) {
+    var wi = VOCAB.findIndex(function (v) { return v.jp === decodeURIComponent(mV[1]); });
+    if (wi >= 0) vIdx = wi;
+    setTab('vocab');
+  } else if (mK) {
+    var ki = KANJI.findIndex(function (k) { return k.kanji === decodeURIComponent(mK[1]); });
+    if (ki >= 0) kIdx = ki;
+    setTab('kanji');
+  } else if (mT) {
+    setTab(mT[1]);
+  }
+
+  kChapters(); kRender();
+  vChapters(); vRender();
+})();
+</script>
+</body>
+</html>

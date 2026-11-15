@@ -12,7 +12,7 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">漢 Kanji Learning &amp; Practice</h1>
-  <p class="subtitle">All N5 kanji from your Kanji Master book — with readings, meanings, example words and audio. Click any kanji for details, or switch to Flashcards / Quiz to practice.</p>
+  <p class="subtitle">All N5 kanji from your Kanji Master book, grouped by chapter — tap a chapter button to see its kanji, then tap any kanji for details and audio. Switch to Flashcards / Quiz to practice.</p>
 
   <div id="tts-banner"></div>
 
@@ -23,13 +23,20 @@
   </div>
 
   <div id="panel-learn" class="tab-panel active">
-    <div class="chips" id="chapter-chips"></div>
     <div class="toolbar">
-      <input type="search" id="k-search" placeholder="Search kanji, readings or meanings…" style="flex:1;min-width:220px">
+      <input type="search" id="k-search" placeholder="Search kanji, readings or meanings…" style="flex:1;min-width:200px">
+      <button class="btn ghost" id="k-select-mode">☑ Select</button>
       <a class="btn primary" id="k-learn-sel" href="learn.html">🎯 Learn selected (<span id="k-selcount">0</span>)</a>
-      <span class="muted small" id="k-count"></span>
     </div>
-    <div class="kanji-grid" id="k-grid"></div>
+    <div class="chapter-grid" id="chapter-grid"></div>
+    <div id="chapter-view" style="display:none">
+      <div class="view-head">
+        <button class="btn ghost" id="back-chapters">📚 Chapters</button>
+        <b id="cur-chapter-title" class="jp"></b>
+        <span class="muted small" id="k-count"></span>
+      </div>
+      <div class="kanji-grid" id="k-grid"></div>
+    </div>
   </div>
 
   <div id="panel-cards" class="tab-panel">
@@ -59,7 +66,7 @@
     </div>
   </div>
 
-  <footer class="page-foot">✍️ Want to practice writing? Open the <a href="kanji-draw.html">Kanji writing practice</a> page.</footer>
+  <footer class="page-foot">✍️ Want to practice writing? Open the <a href="write.html">Writing practice</a> page.</footer>
 </main>
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
@@ -74,6 +81,42 @@
   chapters.sort(function (a, b) { return a.n - b.n; });
 
   var state = { chapter: 0, q: '' };
+  var view = 'chapters', selectMode = false;
+
+  /* chapter buttons — kanji live under their chapter, shown on tap */
+  function renderChapters() {
+    var el = document.getElementById('chapter-grid');
+    el.innerHTML = '<div class="chapter-card" data-n="0"><span class="ch-num">📖</span><span class="ch-title">All kanji</span><span class="ch-count">' + ALL.length + ' kanji</span></div>' +
+      chapters.map(function (c) {
+        var cnt = ALL.filter(function (k) { return k.chapter === c.n; }).length;
+        return '<div class="chapter-card" data-n="' + c.n + '"><span class="ch-num jp">' + (c.n || '?') + '</span>' +
+          '<span class="ch-title jp">' + JL.esc(c.t) + '</span><span class="ch-count">' + cnt + ' kanji</span></div>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chapter-card'), function (b) {
+      b.onclick = function () {
+        state.chapter = parseInt(b.dataset.n, 10);
+        view = 'kanji';
+        document.getElementById('chapter-grid').style.display = 'none';
+        document.getElementById('chapter-view').style.display = '';
+        var c = chapters.filter(function (x) { return x.n === state.chapter; })[0];
+        document.getElementById('cur-chapter-title').textContent = state.chapter ? (state.chapter + '章 ' + (c ? c.t : '')) : 'All kanji';
+        renderGrid();
+      };
+    });
+  }
+  document.getElementById('back-chapters').onclick = function () {
+    view = 'chapters'; state.q = ''; document.getElementById('k-search').value = '';
+    document.getElementById('chapter-view').style.display = 'none';
+    document.getElementById('chapter-grid').style.display = '';
+  };
+  document.getElementById('k-select-mode').onclick = function () {
+    selectMode = !selectMode;
+    this.textContent = selectMode ? '✅ Done selecting' : '☑ Select';
+    this.classList.toggle('primary', selectMode);
+    this.classList.toggle('ghost', !selectMode);
+    document.getElementById('k-grid').classList.toggle('select-mode', selectMode);
+    if (selectMode) JL.toast('Select mode: tap kanji to add them to your Learn list.');
+  };
 
   function chipHtml(n, label) {
     return '<button class="chip' + (state.chapter === n ? ' active' : '') + '" data-n="' + n + '">' + label + '</button>';
@@ -86,13 +129,13 @@
         return chipHtml(c.n, (c.n || '?') + '章 ' + JL.esc(c.t) + ' (' + cnt + ')');
       }).join('');
     Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
-      b.onclick = function () { state.chapter = parseInt(b.dataset.n, 10); renderChips('chapter-chips'); renderChips('chapter-chips2'); renderChips('chapter-chips3'); renderGrid(); };
+      b.onclick = function () { state.chapter = parseInt(b.dataset.n, 10); renderChips('chapter-chips2'); renderChips('chapter-chips3'); if (view === 'kanji') renderGrid(); };
     });
   }
 
   function filtered() {
     return ALL.filter(function (k) {
-      if (state.chapter && k.chapter !== state.chapter) return false;
+      if (state.chapter && !state.q && k.chapter !== state.chapter) return false;
       if (state.q) {
         var q = state.q.toLowerCase();
         var hay = [k.kanji, (k.on || []).join(' '), k.kun, k.meaning, k.en].join(' ').toLowerCase();
@@ -118,10 +161,16 @@
         '<span class="krd jp">' + JL.esc(kReading(k)) + '</span>' +
         '<span class="kmn">' + JL.esc(k.en || k.meaning || '') + '</span></div>';
     }).join('');
+    document.getElementById('k-grid').classList.toggle('select-mode', selectMode);
     Array.prototype.forEach.call(document.querySelectorAll('#k-grid .kanji-card'), function (c) {
       c.onclick = function (e) {
         if (e.target.classList && e.target.classList.contains('sel-check')) return;
         var k = ALL.find(function (x) { return x.id === c.dataset.id; });
+        if (selectMode) {
+          var cb = c.querySelector('.sel-check');
+          if (cb) { cb.checked = !cb.checked; cb.onchange(); }
+          return;
+        }
         openDetail(k);
       };
     });
@@ -154,7 +203,7 @@
       '<p style="text-align:center"><b>' + JL.esc(k.en) + '</b>' + (k.meaning ? ' · <span class="jp">' + JL.esc(k.meaning) + '</span>' : '') + '</p>' +
       '<div style="text-align:center;margin:6px 0 10px">' +
       '<button class="btn" data-say="' + JL.esc(k.kanji) + '">🔊 Listen to the kanji</button> ' +
-      '<a class="btn primary" href="kanji-draw.html?k=' + encodeURIComponent(k.kanji) + '">✍️ Practice writing</a></div>' +
+      '<a class="btn primary" href="write.html?tab=kanji&k=' + encodeURIComponent(k.kanji) + '">✍️ Practice writing</a></div>' +
       '<div class="img-box" id="k-img-box"></div>' +
       (ex ? '<h4>Example words</h4>' + ex : '');
     Array.prototype.forEach.call(document.querySelectorAll('#k-modal-body [data-say]'), function (b) {
@@ -225,7 +274,16 @@
     if (e.target === document.getElementById('k-modal')) document.getElementById('k-modal').classList.add('hidden');
   };
 
-  document.getElementById('k-search').oninput = function () { state.q = this.value.trim(); renderGrid(); };
+  document.getElementById('k-search').oninput = function () {
+    state.q = this.value.trim();
+    if (state.q && view === 'chapters') {
+      view = 'kanji';
+      document.getElementById('chapter-grid').style.display = 'none';
+      document.getElementById('chapter-view').style.display = '';
+      document.getElementById('cur-chapter-title').textContent = 'Search results';
+    }
+    if (view === 'kanji') renderGrid();
+  };
 
   /* tabs */
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
@@ -278,7 +336,8 @@
     if (qs) JL.quiz(document.getElementById('quiz-area'), qs, { title: 'Kanji quiz' });
   };
 
-  renderChips('chapter-chips'); renderChips('chapter-chips2'); renderChips('chapter-chips3');
+  renderChips('chapter-chips2'); renderChips('chapter-chips3');
+  renderChapters();
   renderGrid();
 })();
 </script>

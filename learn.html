@@ -122,8 +122,8 @@
       '<button class="btn" id="l-say">🔊 Listen</button>' +
       '<button class="btn primary" id="l-reveal">' + (revealed ? '🙈 Hide' : '👀 Reveal') + '</button>' +
       (kind === 'kanji'
-        ? '<a class="btn ghost" id="l-write" href="kanji-draw.html?k=' + encodeURIComponent(it.kanji) + '">✍️ Write</a>'
-        : '<a class="btn ghost" id="l-write" href="vocab-draw.html?v=' + encodeURIComponent(it.jp) + '">✍️ Write</a>') +
+        ? '<a class="btn ghost" id="l-write" href="write.html?tab=kanji&k=' + encodeURIComponent(it.kanji) + '">✍️ Write</a>'
+        : '<a class="btn ghost" id="l-write" href="write.html?tab=vocab&v=' + encodeURIComponent(it.jp) + '">✍️ Write</a>') +
       '</div>' +
       '<div class="fc-actions">' +
       '<button class="btn ghost" id="l-prev">← Prev</button>' +

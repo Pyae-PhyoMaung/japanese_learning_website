@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kana — Hiragana &amp; Katakana | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">あア</span><span class="brand-title">Kana — Reading &amp; Writing</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">あア Kana — Hiragana &amp; Katakana</h1>
+  <p class="subtitle">All 46 basic kana, plus dakuten/handakuten and combined sounds — in both scripts. Tap a kana to load it on the writing grid, or use ← Prev / Next → to practice in order.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="hiragana">あ Hiragana</button>
+    <button class="tab" data-tab="katakana">ア Katakana</button>
+  </div>
+
+  <div id="panel-hiragana" class="tab-panel active">
+    <div class="chips" id="h-chips"></div>
+    <div class="kana-grid" id="h-grid"></div>
+  </div>
+
+  <div id="panel-katakana" class="tab-panel">
+    <div class="chips" id="k-chips"></div>
+    <div class="kana-grid" id="k-grid"></div>
+  </div>
+
+  <div class="draw-wrap" style="margin-top:26px">
+    <div class="pad-box">
+      <canvas id="guide-canvas"></canvas>
+      <canvas id="draw-canvas"></canvas>
+    </div>
+    <div class="draw-info">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span class="big-char jp" id="cur-kana">あ</span>
+        <div>
+          <div class="jp" id="cur-row">あ行</div>
+          <div class="muted" id="cur-ro">a</div>
+        </div>
+        <button class="btn" id="say-cur">🔊 Listen</button>
+      </div>
+      <div class="toolbar" style="margin-top:14px">
+        <button class="btn" id="d-prev">← Prev</button>
+        <button class="btn" id="d-next">Next →</button>
+        <button class="btn" id="d-clear">🧹 Clear</button>
+        <button class="btn" id="d-undo">↩ Undo stroke</button>
+        <button class="btn ghost" id="d-guide">👁 Hide guide</button>
+      </div>
+      <p class="muted small" id="progress"></p>
+    </div>
+  </div>
+
+  <footer class="page-foot">Draw with your mouse, finger or stylus. The light-gray character is your tracing guide — hide it to test yourself.</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var DATA = {
+    hiragana: [
+      ['あ行', 'あいうえお', 'a i u e o'],
+      ['か行', 'かきくけこ', 'ka ki ku ke ko'],
+      ['さ行', 'さしすせそ', 'sa shi su se so'],
+      ['た行', 'たちつてと', 'ta chi tsu te to'],
+      ['な行', 'なにぬねの', 'na ni nu ne no'],
+      ['は行', 'はひふへほ', 'ha hi fu he ho'],
+      ['ま行', 'まみむめも', 'ma mi mu me mo'],
+      ['や行', 'やゆよ', 'ya yu yo'],
+      ['ら行', 'らりるれろ', 'ra ri ru re ro'],
+      ['わ行', 'わをん', 'wa wo n'],
+      ['が行', 'がぎぐげご', 'ga gi gu ge go'],
+      ['ざ行', 'ざじずぜぞ', 'za ji zu ze zo'],
+      ['だ行', 'だぢづでど', 'da ji zu de do'],
+      ['ば行', 'ばびぶべぼ', 'ba bi bu be bo'],
+      ['ぱ行', 'ぱぴぷぺぽ', 'pa pi pu pe po'],
+      ['拗音', 'きゃきゅきょしゃしゅしょちゃちゅちょにゃにゅにょひゃひゅひょみゃみゅみょりゃりゅりょぎゃぎゅぎょじゃじゅじょびゃびゅびょぴゃぴゅぴょ',
+       'kya kyu kyo sha shu sho cha chu cho nya nyu nyo hya hyu hyo mya myu myo rya ryu ryo gya gyu gyo ja ju jo bya byu byo pya pyu pyo']
+    ],
+    katakana: [
+      ['ア行', 'アイウエオ', 'a i u e o'],
+      ['カ行', 'カキクケコ', 'ka ki ku ke ko'],
+      ['サ行', 'サシスセソ', 'sa shi su se so'],
+      ['タ行', 'タチツテト', 'ta chi tsu te to'],
+      ['ナ行', 'ナニヌネノ', 'na ni nu ne no'],
+      ['ハ行', 'ハヒフヘホ', 'ha hi fu he ho'],
+      ['マ行', 'マミムメモ', 'ma mi mu me mo'],
+      ['ヤ行', 'ヤユヨ', 'ya yu yo'],
+      ['ラ行', 'ラリルレロ', 'ra ri ru re ro'],
+      ['ワ行', 'ワヲン', 'wa wo n'],
+      ['ガ行', 'ガギグゲゴ', 'ga gi gu ge go'],
+      ['ザ行', 'ザジズゼゾ', 'za ji zu ze zo'],
+      ['ダ行', 'ダヂヅデド', 'da ji zu de do'],
+      ['バ行', 'バビブベボ', 'ba bi bu be bo'],
+      ['パ行', 'パピプペポ', 'pa pi pu pe po'],
+      ['拗音', 'キャキュキョシャシュショチャチュチョニャニュニョヒャヒュヒョミャミュミョリャリュリョギャギュギョジャジュジョビャビュビョピャピュピョ',
+       'kya kyu kyo sha shu sho cha chu cho nya nyu nyo hya hyu hyo mya myu myo rya ryu ryo gya gyu gyo ja ju jo bya byu byo pya pyu pyo']
+    ]
+  };
+  var KANA = {};
+  Object.keys(DATA).forEach(function (t) {
+    KANA[t] = [];
+    DATA[t].forEach(function (row) {
+      var chars = row[1].split('');
+      var roms = row[2].split(' ');
+      chars.forEach(function (c, i) { KANA[t].push({ c: c, r: roms[i] || '', row: row[0] }); });
+    });
+  });
+
+  var tab = 'hiragana';
+  var filter = {};
+  var idx = {};
+  var showGuide = true;
+  var pad = JL.pad('draw-canvas', 'guide-canvas');
+
+  function chips(t) {
+    var el = document.getElementById(t === 'hiragana' ? 'h-chips' : 'k-chips');
+    el.innerHTML = '<button class="chip' + (filter[t] === 'all' ? ' active' : '') + '" data-f="all">All (' + KANA[t].length + ')</button>' +
+      DATA[t].map(function (r) {
+        return '<button class="chip' + (filter[t] === r[0] ? ' active' : '') + '" data-f="' + r[0] + '">' + r[0] + '</button>';
+      }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
+      b.onclick = function () { filter[t] = b.dataset.f; idx[t] = 0; chips(t); grid(t); render(); };
+    });
+  }
+
+  function list(t) { return filter[t] === 'all' ? KANA[t] : KANA[t].filter(function (k) { return k.row === filter[t]; }); }
+
+  function grid(t) {
+    var el = document.getElementById(t === 'hiragana' ? 'h-grid' : 'k-grid');
+    var L = list(t);
+    el.innerHTML = L.map(function (k, i) {
+      return '<div class="kana-card' + (t === tab && i === idx[t] ? ' active' : '') + '" data-i="' + i + '"><span class="ka-char jp">' + JL.esc(k.c) + '</span><span class="ka-ro">' + JL.esc(k.r) + '</span></div>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.kana-card'), function (c) {
+      c.onclick = function () { idx[t] = parseInt(c.dataset.i, 10); grid(t); if (t === tab) render(); };
+    });
+  }
+
+  function render() {
+    var L = list(tab);
+    if (!L.length) return;
+    idx[tab] = Math.min(idx[tab], L.length - 1);
+    var k = L[idx[tab]];
+    document.getElementById('cur-kana').textContent = k.c;
+    document.getElementById('cur-row').textContent = k.row + ' (' + (tab === 'hiragana' ? 'hiragana' : 'katakana') + ')';
+    document.getElementById('cur-ro').textContent = k.r;
+    document.getElementById('progress').textContent = 'Kana ' + (idx[tab] + 1) + ' of ' + L.length;
+    document.getElementById('say-cur').onclick = function () { JL.speak(k.c); };
+    pad.setGuide(k.c, showGuide);
+    pad.clear();
+  }
+
+  document.getElementById('d-prev').onclick = function () { var L = list(tab); idx[tab] = (idx[tab] - 1 + L.length) % L.length; grid(tab); render(); };
+  document.getElementById('d-next').onclick = function () { var L = list(tab); idx[tab] = (idx[tab] + 1) % L.length; grid(tab); render(); };
+  document.getElementById('d-clear').onclick = function () { pad.clear(); };
+  document.getElementById('d-undo').onclick = function () { pad.undo(); };
+  document.getElementById('d-guide').onclick = function () {
+    showGuide = !showGuide;
+    this.textContent = showGuide ? '👁 Hide guide' : '👁 Show guide';
+    pad.setGuide(list(tab)[idx[tab]] ? list(tab)[idx[tab]].c : '', showGuide);
+  };
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+    t.onclick = function () {
+      document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      tab = t.dataset.tab;
+      document.getElementById('panel-' + tab).classList.add('active');
+      render();
+    };
+  });
+
+  /* deep link: kana.html?tab=katakana */
+  var m = location.search.match(/[?&]tab=(hiragana|katakana)/);
+  if (m) {
+    tab = m[1];
+    document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+    document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
+    document.querySelector('.tab[data-tab="' + tab + '"]').classList.add('active');
+    document.getElementById('panel-' + tab).classList.add('active');
+  }
+
+  ['hiragana', 'katakana'].forEach(function (t) { filter[t] = 'all'; idx[t] = 0; chips(t); grid(t); });
+  render();
+})();
+</script>
+</body>
+</html>

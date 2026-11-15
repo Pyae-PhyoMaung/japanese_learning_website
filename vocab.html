@@ -12,7 +12,7 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">語 Vocabulary Learning &amp; Practice</h1>
-  <p class="subtitle">Every word from your books — Japanese, reading, English and Burmese meanings. Tap 🔊 to hear any word, or practice with flashcards and quizzes.</p>
+  <p class="subtitle">Every word from your books, grouped by chapter — tap a chapter to see its words (word, spelling and meaning), then tap a word for details and audio. Practice with flashcards and quizzes.</p>
 
   <div id="tts-banner"></div>
 
@@ -23,13 +23,20 @@
   </div>
 
   <div id="panel-learn" class="tab-panel active">
-    <div class="chips" id="cat-chips"></div>
     <div class="toolbar">
-      <input type="search" id="v-search" placeholder="Search word, reading or meaning…" style="flex:1;min-width:220px">
+      <input type="search" id="v-search" placeholder="Search word, reading or meaning…" style="flex:1;min-width:200px">
+      <button class="btn ghost" id="v-select-mode">☑ Select</button>
       <a class="btn primary" id="v-learn-sel" href="learn.html">🎯 Learn selected (<span id="v-selcount">0</span>)</a>
-      <span class="muted small" id="v-count"></span>
     </div>
-    <div class="vocab-grid" id="v-grid"></div>
+    <div class="chapter-grid" id="chapter-grid"></div>
+    <div id="chapter-view" style="display:none">
+      <div class="view-head">
+        <button class="btn ghost" id="back-chapters">📚 Chapters</button>
+        <b id="cur-chapter-title" class="jp"></b>
+        <span class="muted small" id="v-count"></span>
+      </div>
+      <div class="vocab-card-grid" id="v-grid"></div>
+    </div>
   </div>
 
   <div id="panel-cards" class="tab-panel">
@@ -57,7 +64,15 @@
     <div id="quiz-area" style="margin-top:16px"></div>
   </div>
 
-  <footer class="page-foot">✏️ Want to practice writing words? Open the <a href="vocab-draw.html">Vocabulary writing practice</a> page. You can add your own words in <a href="edit.html">Add / Edit</a>.</footer>
+  <!-- detail modal -->
+  <div class="modal hidden" id="v-modal">
+    <div class="modal-box">
+      <button class="modal-close" id="v-modal-close">✕</button>
+      <div id="v-modal-body"></div>
+    </div>
+  </div>
+
+  <footer class="page-foot">✏️ Want to practice writing words? Open the <a href="write.html">Writing practice</a> page. You can add your own words in <a href="edit.html">Add / Edit</a>.</footer>
 </main>
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
@@ -69,6 +84,48 @@
   ALL.forEach(function (v) { if (v.cat && cats.indexOf(v.cat) < 0) cats.push(v.cat); });
 
   var state = { cat: '', q: '' };
+  var view = 'chapters', selectMode = false;
+
+  /* chapter buttons — words live under their chapter, shown on tap */
+  function renderChapters() {
+    var el = document.getElementById('chapter-grid');
+    var chs = JL.chapters('vocab');
+    var nEss = ALL.filter(function (v) { return !v.chapter; }).length;
+    el.innerHTML = '<div class="chapter-card" data-c="__essential__"><span class="ch-num">★</span><span class="ch-title">Essential &amp; my words</span><span class="ch-count">' + nEss + ' words</span></div>' +
+      chs.filter(function (c) { return c.n > 0; }).map(function (c) {
+        return '<div class="chapter-card" data-c="' + JL.esc(c.t) + '"><span class="ch-num jp">' + c.n + '</span>' +
+          '<span class="ch-title jp">' + JL.esc(c.t) + '</span><span class="ch-count">' + c.count + ' words</span></div>';
+      }).join('') +
+      '<div class="chapter-card" data-c=""><span class="ch-num">📖</span><span class="ch-title">All words</span><span class="ch-count">' + ALL.length + ' words</span></div>';
+    Array.prototype.forEach.call(el.querySelectorAll('.chapter-card'), function (b) {
+      b.onclick = function () {
+        state.cat = b.dataset.c;
+        view = 'words';
+        document.getElementById('chapter-grid').style.display = 'none';
+        document.getElementById('chapter-view').style.display = '';
+        var ch = JL.chapters('vocab').filter(function (c) { return c.t === state.cat; })[0];
+        document.getElementById('cur-chapter-title').textContent =
+          state.cat === '' ? 'All words' :
+          state.cat === '__essential__' ? 'Essential & my words' :
+          (ch && ch.n ? ch.n + '章 ' : '') + (state.cat || '');
+        renderChips('cat-chips2'); renderChips('cat-chips3');
+        renderGrid();
+      };
+    });
+  }
+  document.getElementById('back-chapters').onclick = function () {
+    view = 'chapters'; state.q = ''; document.getElementById('v-search').value = '';
+    document.getElementById('chapter-view').style.display = 'none';
+    document.getElementById('chapter-grid').style.display = '';
+  };
+  document.getElementById('v-select-mode').onclick = function () {
+    selectMode = !selectMode;
+    this.textContent = selectMode ? '✅ Done selecting' : '☑ Select';
+    this.classList.toggle('primary', selectMode);
+    this.classList.toggle('ghost', !selectMode);
+    document.getElementById('v-grid').classList.toggle('select-mode', selectMode);
+    if (selectMode) JL.toast('Select mode: tap words to add them to your Learn list.');
+  };
 
   function meaning(v) { return v.mm || v.en || ''; }
 
@@ -82,14 +139,17 @@
     Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
       b.onclick = function () {
         state.cat = b.dataset.c;
-        renderChips('cat-chips'); renderChips('cat-chips2'); renderChips('cat-chips3'); renderGrid();
+        renderChips('cat-chips2'); renderChips('cat-chips3'); if (view === 'words') renderGrid();
       };
     });
   }
 
   function filtered() {
     return ALL.filter(function (v) {
-      if (state.cat && v.cat !== state.cat) return false;
+      if (state.cat && !state.q) {
+        if (state.cat === '__essential__') { if (v.chapter) return false; }
+        else if (v.cat !== state.cat) return false;
+      }
       if (state.q) {
         var hay = [v.jp, v.rd, v.romaji, v.en, v.mm].join(' ').toLowerCase();
         if (hay.indexOf(state.q.toLowerCase()) < 0) return false;
@@ -104,20 +164,29 @@
     var list = filtered();
     document.getElementById('v-count').textContent = list.length + ' words';
     var sel = JL.pref('sel_vocab') || [];
-    document.getElementById('v-grid').innerHTML = list.map(function (v) {
-      var mm = v.mm || '', en = v.en || '';
-      return '<div class="vocab-row"><button class="speak" data-say="' + JL.esc(speakTarget(v)) + '">🔊</button>' +
+    var grid = document.getElementById('v-grid');
+    grid.classList.toggle('select-mode', selectMode);
+    grid.innerHTML = list.map(function (v) {
+      return '<div class="vocab-card" data-id="' + JL.esc(v.id || '') + '">' +
         '<input type="checkbox" class="sel-check" data-sel="' + JL.esc(v.id || '') + '"' + (v.id && sel.indexOf(v.id) >= 0 ? ' checked' : '') + ' title="Select for Learn">' +
-        '<div><div class="vj jp">' + JL.esc(v.jp) + '</div>' +
-        '<div class="vr jp">' + JL.esc(v.rd || '') + (v.romaji ? ' · ' + JL.esc(v.romaji) : '') + '</div>' +
-        '<div class="muted small" style="margin-top:2px">' + (v.chapter ? v.chapter + '章 ' + JL.esc(v.chapterTitle || '') : JL.esc(v.cat || '')) + '</div></div>' +
-        '<div class="vm"><span class="jp">' + JL.esc(mm) + '</span>' + (en ? ' <span class="muted small">' + JL.esc(en) + '</span>' : '') + '</div>' +
-        '<a class="btn small ghost" href="vocab-draw.html?v=' + encodeURIComponent(v.jp) + '">✏️</a></div>';
+        '<span class="vw jp">' + JL.esc(v.jp) + '</span>' +
+        '<span class="vr jp">' + JL.esc(v.rd || '') + '</span>' +
+        '<span class="vmn"><span class="jp">' + JL.esc(v.mm || '') + '</span>' + (v.en ? ' <span class="muted">' + JL.esc(v.en) + '</span>' : '') + '</span></div>';
     }).join('');
-    Array.prototype.forEach.call(document.querySelectorAll('#v-grid [data-say]'), function (b) {
-      b.onclick = function () { JL.speak(b.dataset.say); };
+    Array.prototype.forEach.call(grid.querySelectorAll('.vocab-card'), function (c) {
+      c.onclick = function (e) {
+        if (e.target.classList && e.target.classList.contains('sel-check')) return;
+        var v = ALL.find(function (x) { return x.id === c.dataset.id; });
+        if (!v) return;
+        if (selectMode) {
+          var cb = c.querySelector('.sel-check');
+          if (cb) { cb.checked = !cb.checked; cb.onchange(); }
+          return;
+        }
+        openDetail(v);
+      };
     });
-    Array.prototype.forEach.call(document.querySelectorAll('#v-grid .sel-check'), function (cb) {
+    Array.prototype.forEach.call(grid.querySelectorAll('.sel-check'), function (cb) {
       cb.onclick = function (e) { e.stopPropagation(); };
       cb.onchange = function () {
         if (!cb.dataset.sel) return;
@@ -132,7 +201,37 @@
     document.getElementById('v-selcount').textContent = sel.length;
   }
 
-  document.getElementById('v-search').oninput = function () { state.q = this.value.trim(); renderGrid(); };
+  /* word detail modal — like the kanji detail, with listen and write */
+  function openDetail(v) {
+    if (!v) return;
+    document.getElementById('v-modal-body').innerHTML =
+      '<h2 class="jp" style="font-size:2.1rem;text-align:center;word-break:break-word">' + JL.esc(v.jp) + '</h2>' +
+      '<p style="text-align:center" class="jp"><b>' + JL.esc(v.rd || '') + '</b>' + (v.romaji ? ' <span class="muted">' + JL.esc(v.romaji) + '</span>' : '') + '</p>' +
+      '<p style="text-align:center"><span class="jp">' + JL.esc(v.mm || '') + '</span>' + (v.en ? ' · <b>' + JL.esc(v.en) + '</b>' : '') + '</p>' +
+      '<p style="text-align:center" class="muted small">' + (v.chapter ? v.chapter + '章 ' + JL.esc(v.chapterTitle || '') : JL.esc(v.cat || '')) + '</p>' +
+      '<div style="text-align:center;margin:6px 0 10px">' +
+      '<button class="btn" data-say="' + JL.esc(v.jp) + '">🔊 Listen to the word</button> ' +
+      '<a class="btn primary" href="write.html?tab=vocab&v=' + encodeURIComponent(v.jp) + '">✍️ Practice writing</a></div>';
+    Array.prototype.forEach.call(document.querySelectorAll('#v-modal-body [data-say]'), function (b) {
+      b.onclick = function () { JL.speak(b.dataset.say); };
+    });
+    document.getElementById('v-modal').classList.remove('hidden');
+  }
+  document.getElementById('v-modal-close').onclick = function () { document.getElementById('v-modal').classList.add('hidden'); };
+  document.getElementById('v-modal').onclick = function (e) {
+    if (e.target === document.getElementById('v-modal')) document.getElementById('v-modal').classList.add('hidden');
+  };
+
+  document.getElementById('v-search').oninput = function () {
+    state.q = this.value.trim();
+    if (state.q && view === 'chapters') {
+      view = 'words';
+      document.getElementById('chapter-grid').style.display = 'none';
+      document.getElementById('chapter-view').style.display = '';
+      document.getElementById('cur-chapter-title').textContent = 'Search results';
+    }
+    if (view === 'words') renderGrid();
+  };
 
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
     t.onclick = function () {
@@ -178,7 +277,8 @@
     JL.quiz(document.getElementById('quiz-area'), qs, { title: 'Vocabulary quiz' });
   };
 
-  renderChips('cat-chips'); renderChips('cat-chips2'); renderChips('cat-chips3');
+  renderChips('cat-chips2'); renderChips('cat-chips3');
+  renderChapters();
   renderGrid();
 })();
 </script>

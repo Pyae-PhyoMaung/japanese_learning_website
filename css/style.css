@@ -259,3 +259,31 @@ details.cat-card[open] summary{margin-bottom:8px}
   .kana-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}
 }
 
+/* ===== Round 10: chapter-button navigation, vocab cards, select mode ===== */
+.chapter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:8px}
+.chapter-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 12px;text-align:center;cursor:pointer;transition:transform .12s ease;box-shadow:var(--shadow);position:relative}
+.chapter-card:hover{transform:translateY(-3px);border-color:var(--accent)}
+.chapter-card .ch-num{font-size:1.9rem;font-weight:700;display:block;line-height:1.1;color:var(--accent)}
+.chapter-card .ch-title{display:block;margin-top:6px;font-size:.9rem;line-height:1.3}
+.chapter-card .ch-count{display:block;color:var(--muted);font-size:.8rem;margin-top:4px}
+.chapter-card.active{border-color:var(--accent);background:var(--accent-soft)}
+
+.vocab-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:8px}
+.vocab-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:12px 8px;text-align:center;cursor:pointer;position:relative;transition:transform .12s ease}
+.vocab-card:hover{transform:translateY(-3px);border-color:var(--accent)}
+.vocab-card .vw{font-size:1.3rem;display:block;line-height:1.25;word-break:break-word}
+.vocab-card .vr{font-size:.85rem;color:var(--muted);display:block;margin-top:2px}
+.vocab-card .vmn{display:block;margin-top:6px;font-size:.8rem;line-height:1.35}
+.vocab-card .sel-check{position:absolute;top:6px;right:6px}
+
+/* selection checkboxes only visible in select mode */
+.sel-check{display:none}
+.select-mode .sel-check{display:block}
+
+.view-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+
+@media (max-width:700px){
+  .chapter-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+  .vocab-card-grid{grid-template-columns:repeat(auto-fill,minmax(135px,1fr))}
+}
+

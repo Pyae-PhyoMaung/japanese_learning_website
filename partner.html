@@ -141,7 +141,7 @@
         return 'Kanji <b class="jp" style="font-size:1.6rem">' + k.kanji + '</b>: ' + JL.esc((k.on || []).join('、')) + ' / ' + JL.esc(k.kun || '') +
           '<br>🇬🇧 ' + JL.esc(k.en || '') + ' · 🇲🇲 ' + JL.esc(k.meaning || '') +
           ' <button class="btn small ghost" data-say="' + JL.esc(k.kanji) + '">🔊</button>' +
-          ' <a class="btn small" href="kanji-draw.html?k=' + encodeURIComponent(k.kanji) + '">✍️ Write it</a>';
+          ' <a class="btn small" href="write.html?tab=kanji&k=' + encodeURIComponent(k.kanji) + '">✍️ Write it</a>';
       }).join('<hr>'));
       return;
     }
