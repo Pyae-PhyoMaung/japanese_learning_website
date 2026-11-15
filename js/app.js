@@ -138,11 +138,26 @@ window.JL = (function () {
   /* js/zg2uni.js is a vendored copy of Google's myanmar-tools (Zawgyi detector + converter).
      It turns Zawgyi — or wrongly-ordered "visual order" typing — into proper Unicode Myanmar,
      and leaves Japanese, English and already-correct Unicode untouched. */
+  /* laptop-keyboard fallback: on the user's Myanmar keyboard a few keys emit raw Latin
+     letters instead of Myanmar signs (observed: m -> ာ U+102C, g -> ါ U+102B; extend the
+     map if more keys are found). Replace a letter only when the neighbour char is Myanmar,
+     so real English words inside the same text stay untouched. */
+  var KB_FIX = { m: '\u102C', g: '\u102B' };
+  function kbfix(s) {
+    if (typeof s !== 'string' || !s) return s;
+    var MM = /[\u1000-\u109F]/, out = '', i, c;
+    for (i = 0; i < s.length; i++) {
+      c = s.charAt(i);
+      if (KB_FIX[c] && (MM.test(s.charAt(i - 1)) || MM.test(s.charAt(i + 1)))) out += KB_FIX[c];
+      else out += c;
+    }
+    return out;
+  }
   function mmfixValue(v) {
     try {
       var ZG = window.JL_ZG;
       if (!ZG) return v;
-      if (typeof v === 'string') return ZG.fix(v);
+      if (typeof v === 'string') return ZG.fix(kbfix(v));
       if (Object.prototype.toString.call(v) === '[object Array]') {
         for (var i = 0; i < v.length; i++) v[i] = mmfixValue(v[i]);
         return v;
@@ -166,7 +181,49 @@ window.JL = (function () {
       if (JSON.stringify(u) !== raw) setUser(u);
     } catch (e) {}
   }
+  /* one-time chapter sync: normalize chapter numbers to real numbers, remap old
+     grammar items that used the lesson number as chapter, and register chapters
+     that exist only in the user's data in the shared uchapters registry */
+  function migrateChapters() {
+    try {
+      if (localStorage.getItem('jl_chfix_v1')) return;
+      localStorage.setItem('jl_chfix_v1', '1');
+      var u = getUser(), changed = false;
+      var uch = (u.prefs && u.prefs.uchapters) || [];
+      /* chapters already covered by the shipped data keep their proper titles,
+         so they are not re-registered from user items */
+      var builtin = {};
+      ['kanji', 'vocab', 'grammar', 'sentences', 'tests'].forEach(function (k2) {
+        merged(k2).forEach(function (it) {
+          if (it && it.chapter != null) builtin[Number(it.chapter) || 0] = 1;
+        });
+      });
+      ['kanji', 'vocab', 'grammar', 'tests'].forEach(function (k) {
+        var st = u[k]; if (!st) return;
+        var items = (st.added || []).concat(Object.keys(st.edited || {}).map(function (id) { return st.edited[id]; }));
+        items.forEach(function (it) {
+          if (!it || it.chapter == null) return;
+          var n = Number(it.chapter);
+          if (!isFinite(n) || n <= 0) return;
+          /* old grammar saves stored the lesson number as the chapter — remap them
+             onto the unified thematic chapters */
+          if (k === 'grammar' && it.lesson != null && it.chapter === it.lesson && window.LESSON_CH && window.LESSON_CH[it.lesson]) n = window.LESSON_CH[it.lesson];
+          if (it.chapter !== n) { it.chapter = n; changed = true; }
+          if (!builtin[n] && !uch.some(function (c) { return Number(c.n) === n; })) {
+            uch.push({ n: n, t: 'Chapter ' + n });
+            changed = true;
+          }
+        });
+      });
+      if (changed) {
+        if (!u.prefs) u.prefs = {};
+        u.prefs.uchapters = uch.sort(function (a, b) { return a.n - b.n; });
+        setUser(u);
+      }
+    } catch (e) {}
+  }
   function loadZg() {
+    migrateChapters();
     if (window.JL_ZG) { migrateZg(); return; }
     var s = document.createElement('script');
     s.src = 'js/zg2uni.js';
@@ -182,7 +239,7 @@ window.JL = (function () {
       if (!ZG || !t || !t.tagName) return;
       var isField = (t.tagName === 'INPUT' && t.type === 'text') || t.tagName === 'TEXTAREA';
       if (!isField) return;
-      var f = ZG.fix(t.value);
+      var f = ZG.fix(kbfix(t.value));
       if (f !== t.value) { t.value = f; toast('Myanmar text converted to Unicode ✓'); }
     } catch (e2) {}
   }, true);
@@ -720,18 +777,30 @@ window.JL = (function () {
     });
   }
 
-  /* ---------- chapter list helper (merges the user's custom chapters) ---------- */
+  /* ---------- unified chapter list (shared by every page) ---------- */
+  /* All pages show the SAME chapters: the union across kanji/vocab/grammar/
+     sentences/tests plus the user's custom chapters (uchapters). So a chapter
+     created anywhere — e.g. a new kanji in chapter 16 — appears on every page.
+     `count` = items of THIS kind in that chapter; chapter 0 ("Essential / my
+     words") only shows on the kind that owns it. */
   function chapters(kind) {
     var seen = {}, out = [];
-    merged(kind).forEach(function (it) {
-      var n = (it.chapter != null) ? it.chapter : 0;
-      if (!seen[n]) { seen[n] = { n: n, t: it.chapterTitle || ('Lesson ' + n), count: 0 }; out.push(seen[n]); }
-      seen[n].count++;
+    ['kanji', 'vocab', 'grammar', 'sentences', 'tests'].forEach(function (k2) {
+      merged(k2).forEach(function (it) {
+        if (it == null) return;
+        var n = (it.chapter != null) ? (Number(it.chapter) || 0) : ((k2 === kind) ? 0 : -1);
+        if (n < 0) return;
+        if (n === 0 && k2 !== kind) return;
+        if (!seen[n]) { seen[n] = { n: n, t: it.chapterTitle || '', count: 0 }; out.push(seen[n]); }
+        if (!seen[n].t && it.chapterTitle) seen[n].t = it.chapterTitle;
+        if (k2 === kind) seen[n].count++;
+      });
     });
     (pref('uchapters') || []).forEach(function (c) {
       if (!c || c.n == null) return;
-      if (!seen[c.n]) { seen[c.n] = { n: c.n, t: c.t || ('Chapter ' + c.n), count: 0 }; out.push(seen[c.n]); }
-      else seen[c.n].t = c.t || seen[c.n].t;
+      var n = Number(c.n);
+      if (!seen[n]) { seen[n] = { n: n, t: c.t || ('Chapter ' + n), count: 0 }; out.push(seen[n]); }
+      else seen[n].t = c.t || seen[n].t;
     });
     out.sort(function (a, b) { return a.n - b.n; });
     return out;

@@ -18,6 +18,7 @@
 
   <div class="toolbar">
     <label class="f" style="flex-direction:row;align-items:center;gap:8px">🐢 Speed <input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="0.9" style="width:160px"> <b id="rate-val">0.9</b> 🐇</label>
+    <label class="f">Chapter <select id="ch-filter"><option value="">All chapters</option></select></label>
   </div>
 
   <div class="tabs">
@@ -97,14 +98,37 @@
     };
   });
 
+  /* chapter filter (shared by all three tabs) */
+  var CH = null;
+  (function () {
+    var sel = document.getElementById('ch-filter');
+    sel.innerHTML = '<option value="">All chapters</option>' + JL.chapters('vocab').map(function (c) {
+      return '<option value="' + c.n + '">' + (c.n ? c.n + '章 ' : '') + JL.esc(c.t) + '</option>';
+    }).join('');
+    sel.onchange = function () {
+      CH = sel.value === '' ? null : Number(sel.value);
+      WORDS = JL.data('vocab').filter(function (v) { return v.jp && (CH == null || Number(v.chapter || 0) === CH); });
+      SENT = JL.data('sentences').filter(function (s) { return s.jp && (CH == null || Number(s.chapter || 0) === CH); });
+      w = WORDS.length ? JL.shuffle(WORDS)[0] : null;
+      s = SENT.length ? JL.shuffle(SENT)[0] : null;
+      document.getElementById('w-reveal-box').textContent = w ? '…' : 'No words in this chapter yet.';
+      document.getElementById('s-reveal-box').textContent = s ? '…' : 'No sentences in this chapter yet.';
+      dPool = SENT.slice(); d = null;
+      document.getElementById('d-result').textContent = '';
+      document.getElementById('d-score').textContent = '0';
+      dScore = 0;
+    };
+  })();
+
   /* words */
-  var WORDS = JL.data('vocab').filter(function (v) { return v.jp; });
+  var WORDS = JL.data('vocab').filter(function (v) { return v.jp && (CH == null || Number(v.chapter || 0) === CH); });
   var w = JL.shuffle(WORDS)[0];
-  function nextWord() { w = JL.shuffle(WORDS)[0]; document.getElementById('w-reveal-box').textContent = '…'; JL.speak(w.jp, rate); }
+  function nextWord() { w = JL.shuffle(WORDS)[0]; document.getElementById('w-reveal-box').textContent = w ? '…' : 'No words in this chapter yet.'; if (w) JL.speak(w.jp, rate); }
   document.getElementById('w-play').onclick = function () { JL.speak(w ? w.jp : '', rate); };
   document.getElementById('w-replay').onclick = function () { JL.speak(w ? w.jp : '', rate); };
   document.getElementById('w-slow').onclick = function () { JL.speak(w ? w.jp : '', 0.55); };
   document.getElementById('w-reveal').onclick = function () {
+    if (!w) return;
     document.getElementById('w-reveal-box').innerHTML =
       '<b style="font-size:1.5rem">' + JL.esc(w.jp) + '</b> <span class="muted">' + JL.esc(w.rd || '') + '</span><br>' +
       JL.esc(w.en || '') + (w.en && w.mm ? ' · ' : '') + '<span class="jp">' + JL.esc(w.mm || '') + '</span>';
@@ -112,13 +136,14 @@
   document.getElementById('w-next').onclick = nextWord;
 
   /* sentences */
-  var SENT = JL.data('sentences').filter(function (s) { return s.jp; });
+  var SENT = JL.data('sentences').filter(function (s) { return s.jp && (CH == null || Number(s.chapter || 0) === CH); });
   var s = JL.shuffle(SENT)[0];
-  function nextSent() { s = JL.shuffle(SENT)[0]; document.getElementById('s-reveal-box').textContent = '…'; JL.speak(s.jp, rate); }
+  function nextSent() { s = JL.shuffle(SENT)[0]; document.getElementById('s-reveal-box').textContent = s ? '…' : 'No sentences in this chapter yet.'; if (s) JL.speak(s.jp, rate); }
   document.getElementById('s-play').onclick = function () { JL.speak(s ? s.jp : '', rate); };
   document.getElementById('s-replay').onclick = function () { JL.speak(s ? s.jp : '', rate); };
   document.getElementById('s-slow').onclick = function () { JL.speak(s ? s.jp : '', 0.55); };
   document.getElementById('s-reveal').onclick = function () {
+    if (!s) return;
     document.getElementById('s-reveal-box').innerHTML =
       '<b>' + JL.esc(s.jp) + '</b><br><span class="muted">' + JL.esc(s.rd || '') + '</span><br>' + JL.esc(s.en || '') + (s.mm ? '<br><span class="jp">' + JL.esc(s.mm) + '</span>' : '');
   };

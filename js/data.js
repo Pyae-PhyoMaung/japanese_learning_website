@@ -108,15 +108,21 @@ window.SENTENCES_OLD = [{"jp": "私は学生です。", "rd": "わたし は が
     28: "~နိုင်သည် (စွမ်းရည် ရှိခြင်း)", 29: "~ခြင်း၊ ~ခြင်း စသည် (အချို့ ဥပမာများ)", 30: "~ဟု ထင်ပါသည် (အမြင်)",
     31: "~ရန် ရည်ရွယ်ထားသည်", 32: "~ပေးမလား (အကူအညီ ပေးရန် ကမ်းလှမ်းခြင်း)"
   };
+  /* Unified chapters: the 32 Minna lessons are grouped into the same 15 thematic
+     chapters the kanji & vocab pages use (the lesson number is kept for reference). */
+  var GT = { 1: 'すうじ (Numbers)', 2: 'カレンダー (Calendar)', 3: '人 (People)', 4: 'しぜん (Nature 1)', 5: '場所 (Places)', 6: '学校 (School 1)', 7: '学校 (School 2)', 8: '家族 (Family)', 9: '動詞 (Verbs 1)', 10: '食べ物 (Food)', 11: '自然 (Nature 2)', 12: '動詞 (Verbs 2)', 13: '町 (Town)', 14: '時間 (Time)', 15: 'けいようし (Adjectives)' };
+  var GC = { 1: 1, 2: 1, 3: 8, 4: 3, 5: 5, 6: 5, 7: 5, 8: 6, 9: 5, 10: 14, 11: 2, 12: 10, 13: 6, 14: 9, 15: 12, 16: 12, 17: 12, 18: 12, 19: 12, 20: 10, 21: 7, 22: 13, 23: 10, 24: 15, 25: 15, 26: 15, 27: 15, 28: 12, 29: 12, 30: 7, 31: 9, 32: 13 };
   var G = [];
   (window.GRAMMAR_OLD || []).forEach(function (g) {
     var x = Object.assign({}, g);
-    x.chapter = parseInt(g.lesson, 10) || 1;
-    x.chapterTitle = 'Lesson ' + x.chapter;
-    x.mm = GM[x.chapter] || '';
+    var L = parseInt(g.lesson, 10) || 1;
+    x.chapter = GC[L] || 1;
+    x.chapterTitle = GT[x.chapter] || ('Chapter ' + x.chapter);
+    x.mm = GM[L] || '';
     G.push(x);
   });
   window.GRAMMAR = G;
+  window.LESSON_CH = GC; /* lesson → chapter map, reused by app.js for user data sync */
 
   var SM = [
     "ကျွန်တော် ကျောင်းသူ ဖြစ်ပါသည်", "တာနာကာဆန် က ဆရာ ဖြစ်ပါသည်",
@@ -147,10 +153,15 @@ window.SENTENCES_OLD = [{"jp": "私は学生です。", "rd": "わたし は が
     "နားမလည်ပါ", "တစ်ကြိမ် ထပ် ပြောပေးပါ", "ဖြည်းဖြည်းချင်း ပြောပေးပါ",
     "အဆင်ပြေပါသည် / ရပါသည်", "သတိထားပါ (ကျန်းမာစွာ သွားပါ)", "ပင်ပန်းသွားပါသည် (အလုပ်ပြီးဆုံး ကြိုဆိုစကား)"
   ];
+  /* Sentences follow the same unified chapters (grammar examples sit with their
+     grammar point's chapter; greetings/daily phrases by topic). */
+  var SC = [1, 1, 1, 8, 8, 3, 5, 5, 5, 5, 5, 5, 6, 6, 5, 5, 14, 14, 2, 2, 10, 10, 6, 6, 9, 9, 12, 12, 12, 12, 12, 12, 12, 10, 10, 7, 7, 13, 13, 10, 10, 15, 15, 15, 15, 15, 15, 12, 12, 7, 9, 13, 3, 13, 10, 10, 10, 3, 3, 3, 6, 14, 14, 6, 3, 3, 6, 6, 3, 3, 3, 3];
   var S = [];
   (window.SENTENCES_OLD || []).forEach(function (s, i) {
     var x = Object.assign({}, s);
     x.mm = SM[i] || '';
+    x.chapter = SC[i] || 0;
+    x.chapterTitle = GT[x.chapter] || '';
     S.push(x);
   });
   window.SENTENCES = S;

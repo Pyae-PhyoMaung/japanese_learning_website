@@ -50,7 +50,8 @@
     <div class="g-card">
       <h3 id="g-form-title">➕ Add grammar point</h3>
       <div class="form-grid">
-        <label class="f">Lesson no. <input type="number" id="gr-lesson" min="1" value="1"></label>
+        <label class="f">Chapter <select id="gr-chapter"><option value="1">1</option></select></label>
+        <label class="f">Lesson no. (reference) <input type="number" id="gr-lesson" min="1" value="1"></label>
         <label class="f">Title <input type="text" id="gr-title" placeholder="〜てください"></label>
         <label class="f">Pattern <input type="text" id="gr-pattern" placeholder="〜てください"></label>
         <label class="f">Meaning <input type="text" id="gr-meaning" placeholder="please do…"></label>
@@ -117,6 +118,7 @@
       <h3>➕ Build your own quiz</h3>
       <div class="form-grid">
         <label class="f">Quiz title <input type="text" id="tq-title" placeholder="My N5 word test"></label>
+        <label class="f">Chapter <select id="tq-chapter"><option value="">— no chapter —</option></select></label>
       </div>
       <div class="dyn-rows" id="tq-questions"></div>
       <button class="btn small ghost" id="tq-add">+ Add question</button>
@@ -126,6 +128,7 @@
       <h3>➕ Build a flashcard deck</h3>
       <div class="form-grid">
         <label class="f">Deck title <input type="text" id="td-title" placeholder="My hard words"></label>
+        <label class="f">Chapter <select id="td-chapter"><option value="">— no chapter —</option></select></label>
       </div>
       <div class="dyn-rows" id="td-cards"></div>
       <button class="btn small ghost" id="td-add">+ Add card</button>
@@ -261,11 +264,17 @@
 
   /* fill the chapter selector from the book chapters (refreshable when chapters change) */
   function fillChapters() {
-    var sel = document.getElementById('v-chapter');
     var chs = JL.chapters('vocab').filter(function (c) { return c.n > 0; });
+    var opts = chs.map(function (c) { return '<option value="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + '</option>'; }).join('');
+    var sel = document.getElementById('v-chapter');
     sel.innerHTML = '<option value="">— keep category —</option>' +
-      '<option value="0">Essential / my words</option>' +
-      chs.map(function (c) { return '<option value="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + '</option>'; }).join('');
+      '<option value="0">Essential / my words</option>' + opts;
+    var gsel = document.getElementById('gr-chapter');
+    if (gsel) { gsel.innerHTML = opts; }
+    var qsel = document.getElementById('tq-chapter');
+    if (qsel) { qsel.innerHTML = '<option value="">— no chapter —</option>' + opts; }
+    var dsel = document.getElementById('td-chapter');
+    if (dsel) { dsel.innerHTML = '<option value="">— no chapter —</option>' + opts; }
   }
   fillChapters();
 
@@ -273,7 +282,7 @@
   function setUchapters(arr) { JL.pref('uchapters', (arr || []).sort(function (a, b) { return a.n - b.n; })); }
   function allChapters() {
     var seen = {};
-    ['kanji', 'vocab', 'grammar'].forEach(function (k) {
+    ['kanji', 'vocab', 'grammar', 'sentences', 'tests'].forEach(function (k) {
       JL.chapters(k).forEach(function (c) {
         if (!seen[c.n]) seen[c.n] = { n: c.n, t: c.t, counts: {} };
         seen[c.n].counts[k] = c.count;
@@ -284,9 +293,9 @@
   function renderChapterList() {
     var list = allChapters();
     var el = document.getElementById('ch-list');
-    el.innerHTML = '<table class="list"><tr><th>Ch.</th><th>Title</th><th>Kanji</th><th>Vocab</th><th>Grammar</th><th></th></tr>' +
+    el.innerHTML = '<table class="list"><tr><th>Ch.</th><th>Title</th><th>Kanji</th><th>Vocab</th><th>Grammar</th><th>Listen</th><th>Tests</th><th></th></tr>' +
       list.map(function (c) {
-        return '<tr><td><b>' + c.n + '</b></td><td class="jp">' + JL.esc(c.t) + '</td><td>' + (c.counts.kanji || 0) + '</td><td>' + (c.counts.vocab || 0) + '</td><td>' + (c.counts.grammar || 0) + '</td>' +
+        return '<tr><td><b>' + c.n + '</b></td><td class="jp">' + JL.esc(c.t) + '</td><td>' + (c.counts.kanji || 0) + '</td><td>' + (c.counts.vocab || 0) + '</td><td>' + (c.counts.grammar || 0) + '</td><td>' + (c.counts.sentences || 0) + '</td><td>' + (c.counts.tests || 0) + '</td>' +
           '<td><button class="btn small" data-chrename="' + c.n + '">✏️ Rename</button> <button class="btn small ghost" data-chdel="' + c.n + '">🗑 Delete</button></td></tr>';
       }).join('') + '</table>';
     Array.prototype.forEach.call(el.querySelectorAll('[data-chrename]'), function (b) {
@@ -380,6 +389,7 @@
         editG = g;
         document.getElementById('g-form-title').textContent = '✏️ Edit: ' + (g.title || '');
         document.getElementById('gr-lesson').value = g.lesson || 1;
+        document.getElementById('gr-chapter').value = String(g.chapter != null ? g.chapter : 1);
         document.getElementById('gr-title').value = g.title || '';
         document.getElementById('gr-pattern').value = g.pattern || '';
         document.getElementById('gr-meaning').value = g.meaning || '';
@@ -410,8 +420,14 @@
     if (!title) { document.getElementById('gr-msg').textContent = 'Title is required.'; return; }
     var item = editG || { id: uid() };
     item.lesson = parseInt(document.getElementById('gr-lesson').value, 10) || 1;
-    item.chapter = item.lesson;
-    item.chapterTitle = (JL.chapters('grammar').filter(function (c) { return c.n === item.lesson; })[0] || {}).t || ('Lesson ' + item.lesson);
+    item.chapter = parseInt(document.getElementById('gr-chapter').value, 10) || 1;
+    var grCh = JL.chapters('grammar').filter(function (c) { return c.n === item.chapter; })[0];
+    if (!grCh) {
+      grCh = { n: item.chapter, t: 'Chapter ' + item.chapter };
+      JL.pref('uchapters', (JL.pref('uchapters') || []).concat([{ n: item.chapter, t: grCh.t }]));
+      fillChapters();
+    }
+    item.chapterTitle = grCh.t;
     item.title = title;
     item.pattern = document.getElementById('gr-pattern').value.trim();
     item.meaning = document.getElementById('gr-meaning').value.trim();
@@ -429,6 +445,7 @@
   document.getElementById('gr-new').onclick = function () {
     editG = null;
     document.getElementById('g-form-title').textContent = '➕ Add grammar point';
+    document.getElementById('gr-chapter').value = '1';
     document.getElementById('gr-title').value = ''; document.getElementById('gr-pattern').value = '';
     document.getElementById('gr-meaning').value = ''; document.getElementById('gr-mm').value = ''; document.getElementById('gr-expl').value = '';
     document.getElementById('gr-examples').innerHTML = '';
@@ -452,7 +469,13 @@
     item.meaning = document.getElementById('k-mm').value.trim();
     item.en = document.getElementById('k-en').value.trim();
     item.chapter = parseInt(document.getElementById('k-chapter').value, 10) || 1;
-    item.chapterTitle = (JL.chapters('kanji').filter(function (c) { return c.n === item.chapter; })[0] || {}).t || 'My kanji';
+    var kCh = JL.chapters('kanji').filter(function (c) { return c.n === item.chapter; })[0];
+    if (!kCh) {
+      kCh = { n: item.chapter, t: 'Chapter ' + item.chapter };
+      JL.pref('uchapters', (JL.pref('uchapters') || []).concat([{ n: item.chapter, t: kCh.t }]));
+      fillChapters();
+    }
+    item.chapterTitle = kCh.t;
     item.examples = readRows(document.getElementById('k-examples')).filter(function (r) { return r[0]; })
       .map(function (r) { return { word: r[0], reading: r[1], meaning: r[2] }; });
     JL.save('kanji', item);
@@ -530,7 +553,9 @@
       return { q: r[0], opts: opts, ans: opts.indexOf(r[1]) };
     });
     var qid = editTQ || uid();
-    JL.save('tests', { id: qid, type: 'quiz', title: title, questions: questions });
+    var qch = parseInt(document.getElementById('tq-chapter').value, 10) || 0;
+    var qchT = qch ? ((JL.chapters('tests').filter(function (c) { return c.n === qch; })[0] || {}).t || '') : '';
+    JL.save('tests', { id: qid, type: 'quiz', title: title, questions: questions, chapter: qch || undefined, chapterTitle: qchT });
     editTQ = qid;
     document.getElementById('tq-msg').textContent = '✓ Quiz saved! Take it in the Tests page.';
     renderTestList();
@@ -540,7 +565,9 @@
     var rows = readRows(document.getElementById('td-cards')).filter(function (r) { return r[0] && r[1]; });
     if (!title || !rows.length) { document.getElementById('td-msg').textContent = 'Title and at least one card are required.'; return; }
     var did = editTD || uid();
-    JL.save('tests', { id: did, type: 'deck', title: title, cards: rows.map(function (r) { return { front: r[0], back: r[1] }; }) });
+    var dch = parseInt(document.getElementById('td-chapter').value, 10) || 0;
+    var dchT = dch ? ((JL.chapters('tests').filter(function (c) { return c.n === dch; })[0] || {}).t || '') : '';
+    JL.save('tests', { id: did, type: 'deck', title: title, cards: rows.map(function (r) { return { front: r[0], back: r[1] }; }), chapter: dch || undefined, chapterTitle: dchT });
     editTD = did;
     document.getElementById('td-msg').textContent = '✓ Deck saved! Study it in the Tests page.';
     renderTestList();
@@ -559,6 +586,7 @@
     if (t.type === 'quiz') {
       editTQ = t.id; editTD = null;
       document.getElementById('tq-title').value = t.title || '';
+      document.getElementById('tq-chapter').value = t.chapter != null ? String(t.chapter) : '';
       var qbox = document.getElementById('tq-questions');
       qbox.innerHTML = '';
       (t.questions || []).forEach(function (q) {
@@ -576,6 +604,7 @@
     } else {
       editTD = t.id; editTQ = null;
       document.getElementById('td-title').value = t.title || '';
+      document.getElementById('td-chapter').value = t.chapter != null ? String(t.chapter) : '';
       var dbox = document.getElementById('td-cards');
       dbox.innerHTML = '';
       (t.cards || []).forEach(function (c) {
@@ -591,6 +620,7 @@
   document.getElementById('tq-new').onclick = function () {
     editTQ = null;
     document.getElementById('tq-title').value = '';
+    document.getElementById('tq-chapter').value = '';
     document.getElementById('tq-questions').innerHTML = '';
     rowsHtml(document.getElementById('tq-questions'), QTF);
     document.getElementById('tq-msg').textContent = '';
@@ -598,6 +628,7 @@
   document.getElementById('td-new').onclick = function () {
     editTD = null;
     document.getElementById('td-title').value = '';
+    document.getElementById('td-chapter').value = '';
     document.getElementById('td-cards').innerHTML = '';
     rowsHtml(document.getElementById('td-cards'), TDF);
     document.getElementById('td-msg').textContent = '';
@@ -608,7 +639,7 @@
     el.innerHTML = '<h3>Your tests</h3>' + (list.length ? '<table class="list"><tr><th>Title</th><th>Type</th><th>Size</th><th></th></tr>' +
       list.map(function (t) {
         var n = ((t.type === 'quiz' ? t.questions : t.cards) || []).length;
-        return '<tr><td><b>' + JL.esc(t.title) + '</b></td><td>' + (t.type === 'quiz' ? 'Quiz' : 'Deck') + '</td><td>' + n + '</td>' +
+        return '<tr><td><b>' + JL.esc(t.title) + '</b>' + (t.chapter ? ' <span class="muted small">' + t.chapter + '章</span>' : '') + '</td><td>' + (t.type === 'quiz' ? 'Quiz' : 'Deck') + '</td><td>' + n + '</td>' +
           '<td><button class="btn small" data-edit="' + t.id + '">✏️</button> <button class="btn small ghost" data-del="' + t.id + '">🗑</button></td></tr>';
       }).join('') + '</table>' : '<p class="muted">No tests yet.</p>');
     Array.prototype.forEach.call(el.querySelectorAll('[data-edit]'), function (b) {
