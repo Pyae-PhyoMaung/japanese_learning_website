@@ -93,7 +93,7 @@
     var nEss = ALL.filter(function (v) { return !v.chapter; }).length;
     el.innerHTML = '<div class="chapter-card" data-c="__essential__"><span class="ch-num">★</span><span class="ch-title">Essential &amp; my words</span><span class="ch-count">' + nEss + ' words</span></div>' +
       chs.filter(function (c) { return c.n > 0; }).map(function (c) {
-        return '<div class="chapter-card" data-c="' + JL.esc(c.t) + '"><span class="ch-num jp">' + c.n + '</span>' +
+        return '<div class="chapter-card" data-c="' + c.n + '"><span class="ch-num jp">' + c.n + '</span>' +
           '<span class="ch-title jp">' + JL.esc(c.t) + '</span><span class="ch-count">' + c.count + ' words</span></div>';
       }).join('') +
       '<div class="chapter-card" data-c=""><span class="ch-num">📖</span><span class="ch-title">All words</span><span class="ch-count">' + ALL.length + ' words</span></div>';
@@ -103,11 +103,11 @@
         view = 'words';
         document.getElementById('chapter-grid').style.display = 'none';
         document.getElementById('chapter-view').style.display = '';
-        var ch = JL.chapters('vocab').filter(function (c) { return c.t === state.cat; })[0];
+        var ch = JL.chapters('vocab').filter(function (c) { return String(c.n) === state.cat; })[0];
         document.getElementById('cur-chapter-title').textContent =
           state.cat === '' ? 'All words' :
           state.cat === '__essential__' ? 'Essential & my words' :
-          (ch && ch.n ? ch.n + '章 ' : '') + (state.cat || '');
+          (ch ? ch.n + '章 ' + ch.t : '');
         renderChips('cat-chips2'); renderChips('cat-chips3');
         renderGrid();
       };
@@ -134,7 +134,7 @@
     el.innerHTML = '<button class="chip' + (state.cat === '' ? ' active' : '') + '" data-c="">All (' + ALL.length + ')</button>' +
       JL.chapters('vocab').map(function (c) {
         var t = c.n ? (c.n + '章 ' + c.t) : c.t;
-        return '<button class="chip' + (state.cat === c.t ? ' active' : '') + '" data-c="' + JL.esc(c.t) + '">' + JL.esc(t) + ' (' + c.count + ')</button>';
+        return '<button class="chip' + (String(c.n) === state.cat ? ' active' : '') + '" data-c="' + c.n + '">' + JL.esc(t) + ' (' + c.count + ')</button>';
       }).join('');
     Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (b) {
       b.onclick = function () {
@@ -148,7 +148,7 @@
     return ALL.filter(function (v) {
       if (state.cat && !state.q) {
         if (state.cat === '__essential__') { if (v.chapter) return false; }
-        else if (v.cat !== state.cat) return false;
+        else if (String(v.chapter || 0) !== state.cat) return false;
       }
       if (state.q) {
         var hay = [v.jp, v.rd, v.romaji, v.en, v.mm].join(' ').toLowerCase();

@@ -6,20 +6,21 @@
 <title>Files | Japanese Learning</title>
 <link rel="stylesheet" href="css/style.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  details.cat-card summary{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  details.cat-card summary h3{margin:0}
+  details.cat-card summary .up-btn{margin-left:auto}
+</style>
 </head>
 <body>
 <header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">My Files</span></header>
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">🗂️ My Files</h1>
-  <p class="subtitle">Upload your own study materials — PDFs, images, Word documents, videos and audio. Uploaded PDFs automatically appear in the Textbook reader, and everything syncs to your account so it follows you to your phone and other laptops. Click a category header to open or close it.</p>
+  <p class="subtitle">Upload study materials for each file type — every category below has its own <b>Upload</b> button. Uploaded files also appear in the <a href="textbook.html">Library</a> page (PDFs open in the reader; images, videos, audio and documents have their own buttons there), and everything syncs to your account. Click a category header to open or close it.</p>
 
-  <div class="g-card">
-    <h3>➕ Upload files</h3>
-    <div class="drop-zone" id="drop-zone">Drop files here, or click to browse<br><span class="muted small">PDF · Images · Videos · Audio · DOCX · TXT</span></div>
-    <input type="file" id="f-input" multiple hidden>
-    <p class="muted small" id="f-status"></p>
-  </div>
+  <p class="muted small" id="f-status" style="margin:8px 0 14px"></p>
+  <input type="file" id="f-input" multiple hidden>
 
   <div id="f-cats"></div>
 
@@ -45,6 +46,7 @@
     { id: 'doc', icon: '📄', label: 'Documents' },
     { id: 'other', icon: '📦', label: 'Other files' }
   ];
+  var ACC = { pdf: 'application/pdf,.pdf', image: 'image/*', video: 'video/*', audio: 'audio/*', doc: '.doc,.docx,.txt,.rtf,.odt,.ppt,.pptx,.xls,.xlsx,.csv', other: '' };
   var openCats = JL.pref('file_cats') || {};
   var curUrl = null;
   var zoomLevel = 1;
@@ -110,7 +112,18 @@
         var d = document.createElement('details');
         d.className = 'g-card cat-card';
         d.open = openCats[cat.id] === true;
-        d.innerHTML = '<summary><h3 style="display:inline-block">' + cat.icon + ' ' + cat.label + ' <span class="muted small">(' + items.length + ')</span> <span class="muted small">— click to open/close</span></h3></summary>';
+        d.innerHTML = '<summary><h3 style="display:inline-block">' + cat.icon + ' ' + cat.label + ' <span class="muted small">(' + items.length + ')</span></h3> ' +
+          '<button class="btn small up-btn" data-up="' + cat.id + '">⬆ Upload</button></summary>';
+        Array.prototype.forEach.call(d.querySelectorAll('[data-up]'), function (b) {
+          b.onclick = function (e) {
+            e.preventDefault(); e.stopPropagation();
+            var inp = document.getElementById('f-input');
+            inp.accept = ACC[cat.id] || '';
+            inp.click();
+            if (!d.open) d.open = true;
+            openCats[cat.id] = true; JL.pref('file_cats', openCats);
+          };
+        });
         d.addEventListener('toggle', function () {
           openCats[cat.id] = d.open;
           JL.pref('file_cats', openCats);
@@ -183,19 +196,11 @@
     });
   }
 
-  var dz = document.getElementById('drop-zone');
-  dz.onclick = function () { document.getElementById('f-input').click(); };
   document.getElementById('f-input').onchange = function () {
     storeFiles(Array.prototype.slice.call(this.files));
     this.value = '';
+    this.accept = '';
   };
-  dz.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.add('drag'); });
-  dz.addEventListener('dragleave', function () { dz.classList.remove('drag'); });
-  dz.addEventListener('drop', function (e) {
-    e.preventDefault();
-    dz.classList.remove('drag');
-    storeFiles(Array.prototype.slice.call(e.dataTransfer.files));
-  });
   document.getElementById('f-modal-close').onclick = closePreview;
   document.getElementById('f-modal').onclick = function (e) { if (e.target === this) closePreview(); };
 

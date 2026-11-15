@@ -387,7 +387,7 @@ window.JL = (function () {
   /* ---------- navigation ---------- */
   var NAV = [
     { href: 'index.html', icon: '🏠', label: 'Home' },
-    { href: 'textbook.html', icon: '📖', label: 'Textbook' },
+    { href: 'textbook.html', icon: '📖', label: 'Library' },
     { href: 'learn.html', icon: '🎯', label: 'Learn' },
     { href: 'kanji.html', icon: '漢', label: 'Kanji' },
     { href: 'vocab.html', icon: '語', label: 'Vocabulary' },
@@ -675,7 +675,7 @@ window.JL = (function () {
     Array.prototype.forEach.call(document.querySelectorAll('.chips'), function (ch) {
       if (ch.previousElementSibling && ch.previousElementSibling.classList.contains('cat-toggle')) return;
       var key = 'cats_' + (ch.id || 'x');
-      var open = pref(key) !== '0';
+      var open = ch.classList.contains('chips-closed') ? pref(key) === '1' : pref(key) !== '0';
       var btn = document.createElement('button');
       btn.className = 'btn small ghost cat-toggle';
       btn.onclick = function () {
