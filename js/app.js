@@ -1,4 +1,32 @@
 /* ===== Japanese Learning Website — shared app core ===== */
+/* ---------- page-heading icons ----------
+   Each page title starts with a lone glyph or emoji (漢, 語, あア, ⚙️, 🎧 …).
+   This turns it into a polished tile (styled in css/style.css as .h-ic):
+   Japanese glyphs get a terracotta gradient badge, emojis a soft framed tile.
+   Runs once per page load; safe to re-run (skips titles already done). */
+function jlTitleIcons() {
+  try {
+    var emoRe = null;
+    try { emoRe = new RegExp('^(\\p{Extended_Pictographic}(?:\\uFE0F|\\u200D\\p{Extended_Pictographic})*)\\s+', 'u'); } catch (e0) {}
+    var jpRe = /^([\u3040-\u30ff\u4e00-\u9faf\u3005]{1,2})\s+/;
+    var els = document.querySelectorAll('h1.page-title');
+    for (var i = 0; i < els.length; i++) {
+      var h = els[i];
+      if (!h || h.querySelector('.h-ic')) continue;
+      var txt = String(h.textContent || '').replace(/^\s+/, '');
+      var m = (emoRe && emoRe.test(txt)) ? txt.match(emoRe) : txt.match(jpRe);
+      if (!m) continue;
+      var isJp = /[\u3040-\u30ff\u4e00-\u9faf\u3005]/.test(m[1]);
+      var ic = document.createElement('span');
+      ic.className = 'h-ic' + (isJp ? ' jp' : ' emo');
+      ic.textContent = m[1];
+      h.textContent = '';
+      h.appendChild(ic);
+      h.appendChild(document.createTextNode(txt.slice(m[0].length)));
+    }
+  } catch (e) {}
+}
+
 /* Base data comes from js/data.js (window.KANJI / VOCAB / GRAMMAR / SENTENCES).
    User additions & edits are kept in localStorage and merged on top of the base data. */
 window.JL = (function () {
@@ -993,7 +1021,7 @@ window.JL = (function () {
   return {
     data: merged, save: save, remove: remove, restore: restore,
     esc: esc, shuffle: shuffle, pickN: pickN, toast: toast, norm: norm, download: download,
-    speak: speak, ttsSupported: ttsSupported, renderNav: renderNav, ttsBanner: ttsBanner, initRouter: initRouter, initCatToggle: initCatToggle,
+    speak: speak, ttsSupported: ttsSupported, renderNav: renderNav, ttsBanner: ttsBanner, initRouter: initRouter, initCatToggle: initCatToggle, titleIcons: jlTitleIcons,
     quiz: quiz, flashcards: flashcards, pad: pad,
     files: { list: filesList, put: filePut, get: fileGet, del: fileDel, cat: fileCat },
     sync: { push: pushUserData, pull: pullUserData, live: startLiveSync },
@@ -1001,4 +1029,4 @@ window.JL = (function () {
     level: level, setLevel: setLevel, byLevel: byLevel, levelBar: mountLevelBar, LEVELS: LEVELS
   };
 })();
-document.addEventListener('DOMContentLoaded', function () { JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.levelBar(); JL.sync.pull(); JL.sync.live(); });
+document.addEventListener('DOMContentLoaded', function () { JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.levelBar(); JL.titleIcons(); JL.sync.pull(); JL.sync.live(); });

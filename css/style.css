@@ -27,6 +27,24 @@ nav#nav a .ic{font-size:1rem}
 /* layout */
 main{max-width:1180px;margin:0 auto;padding:26px 18px 60px}
 h1.page-title{font-size:1.7rem;margin:.2rem 0 .2rem}
+
+/* page-heading icon tiles (created by jlTitleIcons in js/app.js) */
+h1.page-title{display:flex;align-items:center;gap:.65rem}
+.h-ic{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  width:2.55rem;height:2.55rem;border-radius:.8rem;transform:rotate(-4deg);
+  transition:transform .18s ease;user-select:none}
+h1.page-title:hover .h-ic{transform:rotate(2deg) scale(1.08)}
+/* Japanese glyph (漢, 語, あ, ア …): terracotta gradient badge with white glyph */
+.h-ic.jp{font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+  font-size:1.45rem;font-weight:600;color:#fff;letter-spacing:-.02em;
+  background:linear-gradient(140deg,#d1585a 0%,var(--accent) 45%,#8d2f3f 100%);
+  border:1px solid rgba(255,255,255,.28);
+  box-shadow:0 6px 14px rgba(188,71,73,.32),inset 0 1px 0 rgba(255,255,255,.35)}
+/* emoji (⚙️, 🎧, 📝 …): soft cream tile that frames the emoji's own colors */
+.h-ic.emo{font-size:1.5rem;line-height:1;
+  background:linear-gradient(150deg,#ffffff 0%,#fdf6ee 100%);
+  border:1px solid var(--border);
+  box-shadow:0 5px 12px rgba(29,53,87,.10),inset 0 1px 0 #fff}
 .subtitle{color:var(--muted);margin:0 0 20px}
 section.block{margin-top:26px}
 
