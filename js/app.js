@@ -74,19 +74,74 @@ window.JL = (function () {
     } catch (e) {}
     return false;
   }
+  /* Merge two user records — this is what makes the cloud copy durable:
+     items ACCUMULATE by id (like uploaded files), deletions accumulate as
+     tombstones, and `overlay`'s version wins per id. Nothing is ever dropped
+     from the merged result because the other side didn't know about it. */
+  function mergeRecords(base, overlay) {
+    var out = {};
+    try {
+      out = JSON.parse(JSON.stringify((base && typeof base === 'object') ? base : {}));
+    } catch (e) { out = {}; }
+    ['kanji', 'vocab', 'grammar', 'sentences', 'tests'].forEach(function (k) {
+      var b = (base && base[k]) || {}, o = (overlay && overlay[k]) || {};
+      function adds(x) { return (x && Array.isArray(x.added)) ? x.added.filter(function (it) { return it && typeof it === 'object' && it.id != null; }) : []; }
+      function map(x) { return (x && typeof x === 'object' && !Array.isArray(x)) ? x : {}; }
+      /* added: union by id, overlay wins on the same id */
+      var byId = {};
+      adds(b).forEach(function (it) { byId[it.id] = it; });
+      adds(o).forEach(function (it) { byId[it.id] = it; });
+      /* deleted: tombstones accumulate from both sides */
+      var del = {};
+      Object.keys(map(b.deleted)).forEach(function (id) { if (map(b.deleted)[id]) del[id] = true; });
+      Object.keys(map(o.deleted)).forEach(function (id) { if (map(o.deleted)[id]) del[id] = true; });
+      var added = [];
+      Object.keys(byId).forEach(function (id) { if (!del[id]) added.push(byId[id]); });
+      /* edited: overlay wins per id */
+      var edited = {};
+      Object.keys(map(b.edited)).forEach(function (id) { edited[id] = map(b.edited)[id]; });
+      Object.keys(map(o.edited)).forEach(function (id) { edited[id] = map(o.edited)[id]; });
+      out[k] = { added: added, edited: edited, deleted: del };
+    });
+    /* uploaded-file metadata: union by id */
+    var fB = (base && base.files && Array.isArray(base.files.added)) ? base.files.added : [];
+    var fO = (overlay && overlay.files && Array.isArray(overlay.files.added)) ? overlay.files.added : [];
+    var fById = {};
+    fB.concat(fO).forEach(function (m) { if (m && m.id != null) fById[m.id] = m; });
+    out.files = { added: Object.keys(fById).map(function (id) { return fById[id]; }) };
+    /* prefs: keys merged, overlay wins */
+    out.prefs = Object.assign({}, (base && base.prefs) || {}, (overlay && overlay.prefs) || {});
+    return out;
+  }
   function pushUserData() {
     if (location.protocol === 'file:' || typeof fetch === 'undefined') return;
     cloudCfg().then(function (c) {
       if (!c) return;
       try {
         var local = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-        if (!userHasContent(local)) return; /* never overwrite the cloud with an empty record */
-        var body = JSON.stringify({ user_id: c.user || 'main', data: local });
-        fetch(c.url + '/rest/v1/user_data', {
-          method: 'POST',
-          headers: cloudHeaders(c, { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
-          body: body
-        }).catch(function () {});
+        if (!userHasContent(local)) return; /* never push an empty record */
+        /* fetch the server copy first and MERGE: the posted record keeps
+           everything the server already has, so no device — stale, fresh or
+           broken — can ever remove another device's items by pushing */
+        var q = c.url + '/rest/v1/user_data?select=data&user_id=eq.' + encodeURIComponent(c.user || 'main');
+        fetch(q, { headers: cloudHeaders(c) }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rows) {
+          var srv = (rows && rows[0] && rows[0].data) || null;
+          var merged = srv ? mergeRecords(srv, local) : local;
+          merged._sync = { at: Date.now(), dev: String(navigator.userAgent || '').slice(0, 40) };
+          fetch(c.url + '/rest/v1/user_data', {
+            method: 'POST',
+            headers: cloudHeaders(c, { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
+            body: JSON.stringify({ user_id: c.user || 'main', data: merged })
+          }).catch(function () {});
+        }).catch(function () { /* server unreadable — fall back to posting local only */
+          try {
+            fetch(c.url + '/rest/v1/user_data', {
+              method: 'POST',
+              headers: cloudHeaders(c, { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
+              body: JSON.stringify({ user_id: c.user || 'main', data: local })
+            }).catch(function () {});
+          } catch (e2) {}
+        });
       } catch (e) {}
     });
   }
@@ -107,7 +162,20 @@ window.JL = (function () {
         var local = getUser();
         var lat = (local && local._sync && local._sync.at) || 0;
         if ((srv._sync.at || 0) > lat && !userBusy()) {
-          localStorage.setItem(STORE_KEY, JSON.stringify(srv));
+          /* server is newer — MERGE it into local instead of blind-replacing:
+             the server (newer) wins per id, but items that exist only in this
+             browser (made offline / not yet pushed) are kept, never lost */
+          var merged;
+          if (!userHasContent(local)) {
+            merged = srv; /* nothing here — just take the server copy */
+          } else {
+            merged = mergeRecords(local, srv);
+            merged._sync = srv._sync;
+          }
+          localStorage.setItem(STORE_KEY, JSON.stringify(merged));
+          /* if local had items the server lacks, push the merged copy up so
+             they survive everywhere; harmless no-op when nothing was unique */
+          if (merged !== srv && JSON.stringify(merged) !== JSON.stringify(srv)) schedulePush();
           refreshPage();
         }
       }).catch(function () {});
