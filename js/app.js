@@ -55,12 +55,33 @@ window.JL = (function () {
   }
 
   /* ---------- cross-device sync (server-backed user data) ---------- */
+  /* a record with no user content at all must never be pushed — pushing
+     emptiness can only destroy the newer cloud copy (fresh browser, cleared
+     profile, prefs-only state). The `level` pref alone is not content. */
+  function userHasContent(u) {
+    try {
+      var kinds = ['kanji', 'vocab', 'grammar', 'sentences', 'tests'];
+      for (var i = 0; i < kinds.length; i++) {
+        var s = u[kinds[i]];
+        if (!s || typeof s !== 'object') continue;
+        if (Array.isArray(s.added) && s.added.length) return true;
+        if (s.edited && typeof s.edited === 'object' && !Array.isArray(s.edited) && Object.keys(s.edited).length) return true;
+        if (s.deleted && typeof s.deleted === 'object' && !Array.isArray(s.deleted) && Object.keys(s.deleted).length) return true;
+      }
+      if (u.files && Array.isArray(u.files.added) && u.files.added.length) return true;
+      var p = u.prefs || {};
+      for (var pk in p) { if (pk !== 'level') return true; }
+    } catch (e) {}
+    return false;
+  }
   function pushUserData() {
     if (location.protocol === 'file:' || typeof fetch === 'undefined') return;
     cloudCfg().then(function (c) {
       if (!c) return;
       try {
-        var body = JSON.stringify({ user_id: c.user || 'main', data: JSON.parse(localStorage.getItem(STORE_KEY) || '{}') });
+        var local = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+        if (!userHasContent(local)) return; /* never overwrite the cloud with an empty record */
+        var body = JSON.stringify({ user_id: c.user || 'main', data: local });
         fetch(c.url + '/rest/v1/user_data', {
           method: 'POST',
           headers: cloudHeaders(c, { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
@@ -149,12 +170,15 @@ window.JL = (function () {
   }
   /* one-time repair of saved user data (any shape damage from older site
      versions): rebuilds each store as {added:[valid], edited:{}, deleted:{}},
-     rescuing an old array-format store as `added`, then pushes the repaired
-     copy to the cloud so every device gets the fix */
+     rescuing an old array-format store as `added`. IMPORTANT: the repair is
+     written to THIS browser only and never synced — an empty or stale device
+     must never be able to overwrite the newer cloud copy. (The first version
+     of this repair pushed after repairing, which could wipe cloud data.) */
   function migrateShape() {
     try {
-      if (localStorage.getItem('jl_shapefix_v1')) return;
-      localStorage.setItem('jl_shapefix_v1', '1');
+      if (localStorage.getItem('jl_shapefix_v2')) return;
+      localStorage.setItem('jl_shapefix_v2', '1');
+      if (!localStorage.getItem(STORE_KEY)) return; /* fresh browser — nothing to repair, nothing to push */
       var u = getUser(), changed = false;
       ['kanji', 'vocab', 'grammar', 'sentences', 'tests'].forEach(function (k) {
         var s = u[k];
@@ -180,7 +204,7 @@ window.JL = (function () {
       });
       if (u.files && !Array.isArray(u.files.added)) { u.files = { added: (u.files && Array.isArray(u.files)) ? u.files : [] }; changed = true; }
       else if (Array.isArray(u.files)) { u.files = { added: u.files.filter(function (m) { return m && typeof m === 'object'; }) }; changed = true; }
-      if (changed) setUser(u);
+      if (changed) { try { localStorage.setItem(STORE_KEY, JSON.stringify(u)); } catch (e2) {} } /* local write only — never a cloud push */
     } catch (e) {}
   }
   /* ---------- Myanmar (Burmese) text: always store real Unicode, never Zawgyi ---------- */
