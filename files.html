@@ -20,6 +20,7 @@
   <p class="subtitle">Upload study materials for each file type — every category below has its own <b>Upload</b> button. Uploaded files also appear in the <a href="textbook.html">Library</a> page (PDFs open in the reader; images, videos, audio and documents have their own buttons there), and everything syncs to your account. Click a category header to open or close it.</p>
 
   <p class="muted small" id="f-status" style="margin:8px 0 14px"></p>
+  <div id="f-done"></div>
   <input type="file" id="f-input" multiple hidden>
 
   <div id="f-cats"></div>
@@ -174,7 +175,9 @@
 
   function storeFiles(list) {
     if (!list.length) return;
-    var n = list.length, done = 0;
+    var n = list.length, done = 0, saved = [], failed = 0;
+    var panel = document.getElementById('f-done');
+    panel.innerHTML = '';
     Array.prototype.forEach.call(list, function (f) {
       var meta = {
         id: 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
@@ -182,18 +185,45 @@
         size: f.size, added: new Date().toISOString()
       };
       var tooBig = f.size > 40 * 1024 * 1024;
-      if (tooBig) JL.toast(f.name + ' is over 40 MB — it will stay on this device only.');
+      if (tooBig) JL.toast(f.name + ' is over 40 MB — it will stay on this device only.', 'warn');
       JL.files.put(meta, f).then(function () {
-        done++;
+        done++; saved.push(meta);
         document.getElementById('f-status').textContent = 'Saving… ' + done + '/' + n;
-        if (done === n) { JL.toast('Saved ' + n + ' file(s)!'); render(); }
+        if (done === n) finish();
       }).catch(function () {
-        done++;
-        JL.toast('Could not save ' + f.name);
-        if (done === n) render();
+        done++; failed++;
+        JL.toast('Could not save ' + f.name, 'err');
+        if (done === n) finish();
       });
       /* cloud upload (Supabase storage), when configured, happens inside JL.files.put */
     });
+    function finish() {
+      render();
+      if (!saved.length) return;
+      var catLabel = function (c) {
+        var d = CATS.filter(function (x) { return x.id === c; })[0];
+        return d ? (d.icon + ' ' + d.label) : c;
+      };
+      panel.innerHTML = '<div class="upload-done"><h3>✓ Uploaded ' + saved.length + ' file' + (saved.length > 1 ? 's' : '') + '</h3>' +
+        '<p class="muted small" style="margin:0 0 8px">Everything is saved and synced — find it any time from the buttons below or in the Library.</p>' +
+        saved.map(function (m) {
+          return '<div class="file-row"><span class="fname">' + catLabel(m.cat) + ' · <b>' + JL.esc(m.name) + '</b> <span class="muted small">' + fmtSize(m.size) + '</span></span>' +
+            '<button class="btn small" data-prev="' + m.id + '">👁 Open</button></div>';
+        }).join('') +
+        '<div class="toolbar" style="margin-top:10px;margin-bottom:0">' +
+        '<a class="btn small primary" href="textbook.html">📖 Open in Library</a>' +
+        '<button class="btn small ghost" id="f-done-close">✕ Close</button></div></div>';
+      Array.prototype.forEach.call(panel.querySelectorAll('[data-prev]'), function (b) {
+        b.onclick = function () {
+          JL.files.get(b.dataset.prev).then(function (rec) {
+            if (rec) preview({ name: rec.name, cat: rec.cat || JL.files.cat(rec.name, rec.type), size: rec.size, blob: rec.blob });
+          }).catch(function () { JL.toast('Could not load this file.', 'err'); });
+        };
+      });
+      document.getElementById('f-done-close').onclick = function () { panel.innerHTML = ''; };
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      JL.toast('Saved ' + saved.length + ' file' + (saved.length > 1 ? 's' : '') + '!', 'ok');
+    }
   }
 
   document.getElementById('f-input').onchange = function () {

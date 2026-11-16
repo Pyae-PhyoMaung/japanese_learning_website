@@ -12,7 +12,9 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">✍️ Writing Practice</h1>
-  <p class="subtitle">Practice writing kanji and whole words by hand on the guided grid — pick a chapter and work through it, or search for any kanji or word. Trace the light-gray guide, or hide it to test yourself.</p>
+  <p class="subtitle">Practice writing kanji and whole words by hand on the guided grid — pick a chapter and work through it, or search for any kanji or word in your selected level. Trace the light-gray guide, or hide it to test yourself.</p>
+
+  <div id="level-bar"></div>
 
   <div class="tabs">
     <button class="tab active" data-tab="kanji">漢 Kanji</button>
@@ -91,7 +93,7 @@
 <script src="js/app.js"></script>
 <script>
 (function () {
-  var KANJI = JL.data('kanji'), VOCAB = JL.data('vocab').filter(function (v) { return v.jp; });
+  var KANJI = JL.byLevel(JL.data('kanji')), VOCAB = JL.byLevel(JL.data('vocab')).filter(function (v) { return v.jp; });
   var padK = JL.pad('draw-canvas', 'guide-canvas');
   var padV = JL.pad('draw-canvas2', 'guide-canvas2');
 

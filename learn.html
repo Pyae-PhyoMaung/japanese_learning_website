@@ -12,9 +12,9 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">🎯 Learn Session</h1>
-  <p class="subtitle">Study the kanji and words you selected on the Kanji / Vocabulary pages, or learn a whole chapter at once. Readings and meanings stay hidden until you tap “Reveal”.</p>
+  <p class="subtitle">Study the kanji and words you selected on the Kanji / Vocabulary pages, or learn a whole chapter at once — all in your selected JLPT level. Readings and meanings stay hidden until you tap “Reveal”.</p>
 
-  <div id="tts-banner"></div>
+  <div id="level-bar"></div>
 
   <div class="tabs">
     <button class="tab active" data-tab="kanji">Kanji</button>
@@ -45,8 +45,7 @@
 <script src="js/app.js"></script>
 <script>
 (function () {
-  var DATA = { kanji: JL.data('kanji'), vocab: JL.data('vocab') };
-  JL.ttsBanner('tts-banner');
+  var DATA = { kanji: JL.byLevel(JL.data('kanji')), vocab: JL.byLevel(JL.data('vocab')) };
 
   var kind = 'kanji';
   var items = [], idx = 0, revealed = false;
@@ -169,6 +168,14 @@
     };
   });
 
+  /* deep link from the Kanji / Vocabulary pages: learn.html?kind=vocab|kanji
+     auto-opens that tab and starts your selected list right away */
+  var km = location.search.match(/[?&]kind=(kanji|vocab)/);
+  if (km) {
+    var tabBtn = document.querySelector('.tab[data-tab="' + km[1] + '"]');
+    if (tabBtn) tabBtn.click();
+    startSelected();
+  }
   updateCounts();
   renderChips();
   render();

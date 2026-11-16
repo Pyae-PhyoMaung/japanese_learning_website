@@ -14,7 +14,7 @@
   <h1 class="page-title">📝 Practice Tests</h1>
   <p class="subtitle">Practice with flashcards and auto-generated quizzes from your study data, or take the custom tests and flashcard decks you build yourself.</p>
 
-  <div id="tts-banner"></div>
+  <div id="level-bar"></div>
 
   <div class="tabs">
     <button class="tab active" data-tab="cards">Flashcards</button>
@@ -63,7 +63,6 @@
 <script src="js/app.js"></script>
 <script>
 (function () {
-  JL.ttsBanner('tts-banner');
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
     t.onclick = function () {
       document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
@@ -73,7 +72,7 @@
     };
   });
 
-  var KANJI = JL.data('kanji'), VOCAB = JL.data('vocab'), GRAM = JL.data('grammar'), SENT = JL.data('sentences');
+  var KANJI = JL.byLevel(JL.data('kanji')), VOCAB = JL.byLevel(JL.data('vocab')), GRAM = JL.byLevel(JL.data('grammar')), SENT = JL.byLevel(JL.data('sentences'));
 
   /* chapter selectors for both generators */
   (function () {
@@ -168,7 +167,7 @@
     return ((u.tests || {}).added) || [];
   }
   function renderMine() {
-    var list = userTests();
+    var list = userTests().filter(function (t) { return (t.level || 'N5') === JL.level(); });
     var el = document.getElementById('mine-list');
     if (!list.length) {
       el.innerHTML = '<div class="notice">You have no custom tests yet. Go to <a href="edit.html">Add / Edit → Tests</a> to create quizzes and flashcard decks of your own.</div>';

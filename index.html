@@ -8,13 +8,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-<header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">Japanese Learning Website — JLPT N5</span></header>
+<header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">Japanese Learning Website — JLPT <span id="lvl-title">N5</span></span></header>
 <nav id="nav"></nav>
 <main>
+  <div id="level-bar"></div>
   <div class="hero">
     <div>
       <h1>Learn Japanese, your way 🌸</h1>
-      <p>Read the full textbook, learn and practice kanji, vocabulary and grammar, train your listening with audio, and build your own flashcards and quizzes — all from your N5 books.</p>
+      <p>Choose your JLPT level above, then read the textbook, learn and practice kanji, vocabulary and grammar, train your listening, and build your own flashcards and quizzes.</p>
     </div>
     <div class="jp jp-big">日本語</div>
   </div>
@@ -32,11 +33,12 @@
     <div class="cards">
       <a class="card" href="textbook.html"><span class="c-icon">📖</span><h3>My Library</h3><p>Read the complete Minna no Nihongo N5 (Myanmar translation) and N5 Kanji Master books — plus all the files you upload: PDFs, images, videos and audio.</p><span class="go">Open library →</span></a>
       <a class="card" href="learn.html"><span class="c-icon">🎯</span><h3>Learn Selected &amp; Chapters</h3><p>Check kanji and words on their pages, then study just those — or learn a whole chapter. Meanings are revealed only when you ask.</p><span class="go">Start learning →</span></a>
-      <a class="card" href="kanji.html"><span class="c-icon">漢</span><h3>Kanji Learning &amp; Practice</h3><p>Browse 112 N5 kanji with readings, meanings and example words. Listen, flashcards and quizzes.</p><span class="go">Learn kanji →</span></a>
+      <a class="card" href="kanji.html"><span class="c-icon">漢</span><h3>Kanji Learning &amp; Practice</h3><p>Browse kanji with readings, meanings and example words. Listen, flashcards and quizzes.</p><span class="go">Learn kanji →</span></a>
       <a class="card" href="write.html"><span class="c-icon">✍️</span><h3>Writing Practice</h3><p>Practice writing kanji and whole words by chapter on a guided grid — trace the guide or hide it to test yourself.</p><span class="go">Start writing →</span></a>
       <a class="card" href="vocab.html"><span class="c-icon">語</span><h3>Vocabulary Learning &amp; Practice</h3><p>Study the word list with Japanese, readings and meanings. Listen to every word, then practice with flashcards and quizzes.</p><span class="go">Learn words →</span></a>
+      <a class="card" href="dictionary.html"><span class="c-icon">辞</span><h3>Dictionary</h3><p>Look up any word in English, Japanese or Myanmar — meanings, example sentences, synonyms and antonyms when available.</p><span class="go">Open dictionary →</span></a>
       <a class="card" href="kana.html"><span class="c-icon">あア</span><h3>Kana — Hiragana &amp; Katakana</h3><p>All hiragana and katakana in one place: tap a kana to read it, hear it and write it on the practice grid.</p><span class="go">Open kana →</span></a>
-      <a class="card" href="grammar.html"><span class="c-icon">文</span><h3>Grammar Learning &amp; Exercises</h3><p>N5 grammar points from です to つもりです, each with examples and interactive exercises.</p><span class="go">Learn grammar →</span></a>
+      <a class="card" href="grammar.html"><span class="c-icon">文</span><h3>Grammar Learning &amp; Exercises</h3><p>Grammar points from です to つもりです, each with examples and interactive exercises.</p><span class="go">Learn grammar →</span></a>
       <a class="card" href="listening.html"><span class="c-icon">🎧</span><h3>Listening Session</h3><p>Listen to words and sentences with adjustable speed, plus dictation practice.</p><span class="go">Start listening →</span></a>
       <a class="card" href="tests.html"><span class="c-icon">📝</span><h3>Practice Tests</h3><p>Flashcards, quizzes on kanji/vocab/grammar, and your own custom tests and flashcard decks.</p><span class="go">Take tests →</span></a>
       <a class="card" href="files.html"><span class="c-icon">🗂️</span><h3>My Files</h3><p>Upload and manage your own PDFs, images, documents, videos and audio — uploaded PDFs appear in the Library reader, images, videos and audio play right there too.</p><span class="go">Open files →</span></a>
@@ -46,17 +48,18 @@
   </section>
 
   <footer class="page-foot">
-    Built from your books: “N5 Kanji Master” and “Minna no Nihongo N5 (Myanmar translation)”. Audio uses Google text-to-speech online, with your device’s Japanese voice as a backup.
+    Built from your books: “N5 Kanji Master” and “Minna no Nihongo N5 (Myanmar translation)”. Audio uses your device’s Japanese voice (ja-JP).
   </footer>
 </main>
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 <script>
 (function(){
-  var k = JL.data('kanji').length,
-      v = JL.data('vocab').length,
-      g = JL.data('grammar').length,
-      s = JL.data('sentences').length;
+  document.getElementById('lvl-title').textContent = JL.level();
+  var k = JL.byLevel(JL.data('kanji')).length,
+      v = JL.byLevel(JL.data('vocab')).length,
+      g = JL.byLevel(JL.data('grammar')).length,
+      s = JL.byLevel(JL.data('sentences')).length;
   document.getElementById('stat-kanji').textContent = k;
   document.getElementById('stat-vocab').textContent = v;
   document.getElementById('stat-grammar').textContent = g;

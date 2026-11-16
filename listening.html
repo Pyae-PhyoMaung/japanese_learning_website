@@ -20,6 +20,8 @@
   <h1 class="page-title">🎧 Listening Session</h1>
   <p class="subtitle">Train your ear with words and full sentences using Japanese speech synthesis — replay, slow down, and test yourself with dictation.</p>
 
+  <div id="level-bar"></div>
+
   <div class="notice" id="tts-note" hidden>Checking Japanese voice…</div>
 
   <div class="toolbar">
@@ -120,8 +122,8 @@
     }).join('');
     sel.onchange = function () {
       CH = sel.value === '' ? null : Number(sel.value);
-      WORDS = JL.data('vocab').filter(function (v) { return v.jp && (CH == null || Number(v.chapter || 0) === CH); });
-      SENT = JL.data('sentences').filter(function (s) { return s.jp && (CH == null || Number(s.chapter || 0) === CH); });
+      WORDS = JL.byLevel(JL.data('vocab')).filter(function (v) { return v.jp && (CH == null || Number(v.chapter || 0) === CH); });
+      SENT = JL.byLevel(JL.data('sentences')).filter(function (s) { return s.jp && (CH == null || Number(s.chapter || 0) === CH); });
       w = WORDS.length ? JL.shuffle(WORDS)[0] : null;
       s = SENT.length ? JL.shuffle(SENT)[0] : null;
       document.getElementById('w-reveal-box').textContent = w ? '…' : 'No words in this chapter yet.';
@@ -135,7 +137,7 @@
   })();
 
   /* words */
-  var WORDS = JL.data('vocab').filter(function (v) { return v.jp && (CH == null || Number(v.chapter || 0) === CH); });
+  var WORDS = JL.byLevel(JL.data('vocab')).filter(function (v) { return v.jp && (CH == null || Number(v.chapter || 0) === CH); });
   var w = JL.shuffle(WORDS)[0];
   function nextWord() { w = JL.shuffle(WORDS)[0]; document.getElementById('w-reveal-box').textContent = w ? '…' : 'No words in this chapter yet.'; if (w) JL.speak(w.jp, rate); }
   document.getElementById('w-play').onclick = function () { JL.speak(w ? w.jp : '', rate); };
@@ -150,7 +152,7 @@
   document.getElementById('w-next').onclick = nextWord;
 
   /* sentences */
-  var SENT = JL.data('sentences').filter(function (s) { return s.jp && (CH == null || Number(s.chapter || 0) === CH); });
+  var SENT = JL.byLevel(JL.data('sentences')).filter(function (s) { return s.jp && (CH == null || Number(s.chapter || 0) === CH); });
   var s = JL.shuffle(SENT)[0];
   function nextSent() { s = JL.shuffle(SENT)[0]; document.getElementById('s-reveal-box').textContent = s ? '…' : 'No sentences in this chapter yet.'; if (s) JL.speak(s.jp, rate); }
   document.getElementById('s-play').onclick = function () { JL.speak(s ? s.jp : '', rate); };

@@ -12,9 +12,9 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">語 Vocabulary Learning &amp; Practice</h1>
-  <p class="subtitle">Every word from your books, grouped by chapter — tap a chapter to see its words (word, spelling and meaning), then tap a word for details and audio. Practice with flashcards and quizzes.</p>
+  <p class="subtitle">Words of your selected JLPT level, grouped by chapter — tap a chapter to see its words (word, spelling and meaning), then tap a word for details and audio. Practice with flashcards and quizzes.</p>
 
-  <div id="tts-banner"></div>
+  <div id="level-bar"></div>
 
   <div class="tabs">
     <button class="tab active" data-tab="learn">Learn</button>
@@ -26,7 +26,8 @@
     <div class="toolbar">
       <input type="search" id="v-search" placeholder="Search word, reading or meaning…" style="flex:1;min-width:200px">
       <button class="btn ghost" id="v-select-mode">☑ Select</button>
-      <a class="btn primary" id="v-learn-sel" href="learn.html">🎯 Learn selected (<span id="v-selcount">0</span>)</a>
+      <a class="btn primary" id="v-learn-sel" href="learn.html?kind=vocab">🎯 Learn selected (<span id="v-selcount">0</span>)</a>
+      <button class="btn ghost" id="v-clearsel">✕ Clear selection</button>
     </div>
     <div class="chapter-grid" id="chapter-grid"></div>
     <div id="chapter-view" style="display:none">
@@ -78,8 +79,7 @@
 <script src="js/app.js"></script>
 <script>
 (function () {
-  var ALL = JL.data('vocab');
-  JL.ttsBanner('tts-banner');
+  var ALL = JL.byLevel(JL.data('vocab'));
   var cats = [];
   ALL.forEach(function (v) { if (v.cat && cats.indexOf(v.cat) < 0) cats.push(v.cat); });
 
@@ -124,7 +124,13 @@
     this.classList.toggle('primary', selectMode);
     this.classList.toggle('ghost', !selectMode);
     document.getElementById('v-grid').classList.toggle('select-mode', selectMode);
-    if (selectMode) JL.toast('Select mode: tap words to add them to your Learn list.');
+    if (selectMode) JL.toast('Select mode: tap words to add them to your Learn list.', 'ok');
+  };
+  document.getElementById('v-clearsel').onclick = function () {
+    JL.pref('sel_vocab', []);
+    document.getElementById('v-selcount').textContent = '0';
+    renderGrid();
+    JL.toast('Selection cleared.', 'ok');
   };
 
   function meaning(v) { return v.mm || v.en || ''; }

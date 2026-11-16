@@ -12,9 +12,9 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">漢 Kanji Learning &amp; Practice</h1>
-  <p class="subtitle">All N5 kanji from your Kanji Master book, grouped by chapter — tap a chapter button to see its kanji, then tap any kanji for details and audio. Switch to Flashcards / Quiz to practice.</p>
+  <p class="subtitle">Kanji of your selected JLPT level, grouped by chapter — tap a chapter button to see its kanji, then tap any kanji for details and audio. Switch to Flashcards / Quiz to practice.</p>
 
-  <div id="tts-banner"></div>
+  <div id="level-bar"></div>
 
   <div class="tabs">
     <button class="tab active" data-tab="learn">Learn</button>
@@ -26,7 +26,8 @@
     <div class="toolbar">
       <input type="search" id="k-search" placeholder="Search kanji, readings or meanings…" style="flex:1;min-width:200px">
       <button class="btn ghost" id="k-select-mode">☑ Select</button>
-      <a class="btn primary" id="k-learn-sel" href="learn.html">🎯 Learn selected (<span id="k-selcount">0</span>)</a>
+      <a class="btn primary" id="k-learn-sel" href="learn.html?kind=kanji">🎯 Learn selected (<span id="k-selcount">0</span>)</a>
+      <button class="btn ghost" id="k-clearsel">✕ Clear selection</button>
     </div>
     <div class="chapter-grid" id="chapter-grid"></div>
     <div id="chapter-view" style="display:none">
@@ -72,8 +73,7 @@
 <script src="js/app.js"></script>
 <script>
 (function () {
-  var ALL = JL.data('kanji');
-  JL.ttsBanner('tts-banner');
+  var ALL = JL.byLevel(JL.data('kanji'));
   var chapters = [];
   ALL.forEach(function (k) {
     if (!chapters.some(function (c) { return c.n === k.chapter; })) chapters.push({ n: k.chapter, t: k.chapterTitle });
@@ -115,7 +115,13 @@
     this.classList.toggle('primary', selectMode);
     this.classList.toggle('ghost', !selectMode);
     document.getElementById('k-grid').classList.toggle('select-mode', selectMode);
-    if (selectMode) JL.toast('Select mode: tap kanji to add them to your Learn list.');
+    if (selectMode) JL.toast('Select mode: tap kanji to add them to your Learn list.', 'ok');
+  };
+  document.getElementById('k-clearsel').onclick = function () {
+    JL.pref('sel_kanji', []);
+    document.getElementById('k-selcount').textContent = '0';
+    renderGrid();
+    JL.toast('Selection cleared.', 'ok');
   };
 
   function chipHtml(n, label) {
@@ -224,7 +230,21 @@
         '<button class="btn small" id="k-img-chg">🔄 Change image</button> ' +
         '<button class="btn small ghost" id="k-img-del">🗑 Remove</button></div>';
       document.getElementById('k-img-chg').onclick = function () { pickFile(k); };
-      document.getElementById('k-img-del').onclick = function () { JL.kimg.set(k.id, null); renderImgBox(k); renderGrid(); JL.toast('Image removed.'); };
+      document.getElementById('k-img-del').onclick = function () {
+        var fid = JL.kimg.get(k.id);
+        JL.kimg.set(k.id, null);
+        /* a kanji-uploaded image is deleted from My Files (and cloud) too;
+           an image picked from your own library is only unlinked, so your file stays */
+        if (fid && String(fid).indexOf('f_kimg_') === 0) {
+          JL.files.del(fid).then(function () {
+            renderImgBox(k); renderGrid();
+            JL.toast('Image removed and deleted from your files.', 'ok');
+          });
+        } else {
+          renderImgBox(k); renderGrid();
+          JL.toast('Image removed.', 'ok');
+        }
+      };
       JL.files.get(fid).then(function (rec) {
         var el = document.getElementById('k-img-el');
         if (el && rec && rec.blob) el.src = URL.createObjectURL(rec.blob);
@@ -248,10 +268,12 @@
       var ext = (f.name.split('.').pop() || 'png').toLowerCase();
       var meta = { id: 'f_kimg_' + k.id + '_' + Date.now(), cat: 'image', name: 'kanji_' + k.kanji + '.' + ext, type: f.type, size: f.size, added: new Date().toISOString().slice(0, 10) };
       JL.files.put(meta, f).then(function (m) {
+        var old = JL.kimg.get(k.id);
         JL.kimg.set(k.id, m.id);
+        if (old && String(old).indexOf('f_kimg_') === 0 && old !== m.id) JL.files.del(old);
         renderImgBox(k); renderGrid();
-        JL.toast('Image attached ✅');
-      }).catch(function () { JL.toast('Upload failed.'); });
+        JL.toast('Image attached ✅', 'ok');
+      }).catch(function () { JL.toast('Upload failed.', 'err'); });
     };
     inp.click();
   }

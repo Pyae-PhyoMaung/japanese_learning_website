@@ -12,9 +12,9 @@
 <nav id="nav"></nav>
 <main>
   <h1 class="page-title">文 Grammar Learning &amp; Exercises</h1>
-  <p class="subtitle">N5 grammar points grouped by chapter/lesson — tap a chapter to see its grammar, then study each point with examples you can listen to and interactive exercises.</p>
+  <p class="subtitle">Grammar points of your selected JLPT level, grouped by chapter/lesson — tap a chapter to see its grammar, then study each point with examples you can listen to and interactive exercises.</p>
 
-  <div id="tts-banner"></div>
+  <div id="level-bar"></div>
 
   <div class="toolbar">
     <input type="search" id="g-search" placeholder="Search grammar, e.g. てください, particle, want…" style="flex:1;min-width:220px">
@@ -47,8 +47,7 @@
 <script src="js/app.js"></script>
 <script>
 (function () {
-  var ALL = JL.data('grammar');
-  JL.ttsBanner('tts-banner');
+  var ALL = JL.byLevel(JL.data('grammar'));
   var q = '', ch = 0, view = 'chapters';
 
   function renderChapters() {

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dictionary | Japanese Learning</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">辞書</span><span class="brand-title">Dictionary</span></header>
+<nav id="nav"></nav>
+<main>
+  <h1 class="page-title">辞 Dictionary</h1>
+  <p class="subtitle">Type an English, Japanese or Myanmar word — get the Japanese, English and Myanmar meanings, plus example sentences, synonyms and antonyms when available. It searches every JLPT level.</p>
+
+  <div class="toolbar">
+    <input type="search" id="d-q" placeholder="例：water, たべる, ထမင်း …" style="flex:1;min-width:240px;font-size:1.05rem" autofocus>
+    <button class="btn primary" id="d-go">🔍 Search</button>
+    <button class="btn ghost" id="d-clear">✕ Clear</button>
+  </div>
+  <div id="d-status" class="muted small" style="margin:0 0 12px"></div>
+  <div id="d-results"></div>
+
+  <footer class="page-foot">Synonyms and antonyms appear when the word has them — add your own in <a href="edit.html">Add / Edit</a> (Synonyms / Antonyms fields on the vocabulary form).</footer>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var VOCAB = JL.data('vocab');
+  var KANJI = JL.data('kanji');
+  var SENT = JL.data('sentences');
+  var curLvl = JL.level();
+
+  function sentencesFor(v) {
+    var w = String(v.jp || '');
+    if (!w || w.length < 2) return [];
+    var out = [];
+    for (var i = 0; i < SENT.length && out.length < 3; i++) {
+      if (String(SENT[i].jp || '').indexOf(w) >= 0) out.push(SENT[i]);
+    }
+    return out;
+  }
+
+  function match(v, q) {
+    var jp = String(v.jp || ''), rd = String(v.rd || ''), ro = String(v.romaji || '').toLowerCase(),
+        en = String(v.en || '').toLowerCase(), mm = String(v.mm || '');
+    if (jp === q) return 3;
+    if (jp.indexOf(q) >= 0 || rd.indexOf(q) >= 0 || mm.indexOf(q) >= 0) return 2;
+    if (ro.indexOf(q) >= 0 || en.indexOf(q) >= 0) return 2;
+    if ((v.syn || '').toLowerCase().indexOf(q) >= 0 || (v.ant || '').toLowerCase().indexOf(q) >= 0) return 1;
+    return 0;
+  }
+
+  function card(v) {
+    var exs = sentencesFor(v);
+    var exHtml = exs.length ? '<div class="d-ex"><h4>Example sentences</h4>' + exs.map(function (s) {
+      return '<div class="example"><button class="speak" data-say="' + JL.esc(s.jp) + '">🔊</button>' +
+        '<div><div class="ex-j jp">' + JL.esc(s.jp) + (s.rd ? ' <span class="ex-r">' + JL.esc(s.rd) + '</span>' : '') + '</div>' +
+        '<div class="ex-e">' + JL.esc(s.en || '') + (s.mm ? ' · <span class="jp">' + JL.esc(s.mm) + '</span>' : '') + '</div></div></div>';
+    }).join('') + '</div>' : '';
+    var synHtml = v.syn ? '<div><b>Synonyms:</b> ' + v.syn.split(/[,、]\s*/).map(function (s) { return '<span class="dict-syn jp">' + JL.esc(s) + '</span>'; }).join('') + '</div>' : '';
+    var antHtml = v.ant ? '<div><b>Antonyms:</b> ' + v.ant.split(/[,、]\s*/).map(function (s) { return '<span class="dict-ant jp">' + JL.esc(s) + '</span>'; }).join('') + '</div>' : '';
+    return '<div class="dict-card">' +
+      '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+      '<span class="dw jp">' + JL.esc(v.jp) + '</span>' +
+      '<button class="btn" data-say="' + JL.esc(v.jp) + '">🔊 Listen</button>' +
+      '<a class="btn ghost" href="write.html?tab=vocab&v=' + encodeURIComponent(v.jp) + '">✍️ Write</a>' +
+      '<span class="lvl-badge">' + (v.level || 'N5') + '</span></div>' +
+      '<p class="jp" style="margin:6px 0 0"><b>' + JL.esc(v.rd || '') + '</b>' + (v.romaji ? ' <span class="muted">' + JL.esc(v.romaji) + '</span>' : '') + '</p>' +
+      '<div class="d-meanings">' +
+      '<div><b>Myanmar:</b> <span class="jp">' + JL.esc(v.mm || '—') + '</span></div>' +
+      '<div><b>English:</b> ' + JL.esc(v.en || '—') + '</div></div>' +
+      (synHtml || antHtml ? '<div style="margin:6px 0">' + synHtml + antHtml + '</div>' : '') +
+      exHtml +
+      '<p class="muted small" style="margin:8px 0 0">' + (v.chapter ? v.chapter + '章 ' + JL.esc(v.chapterTitle || '') : JL.esc(v.cat || '')) + '</p></div>';
+  }
+
+  function kanjiCards(q) {
+    var hits = KANJI.map(function (k) {
+      var m = (String(k.kanji) === q) ? 3 :
+        ([k.kanji, (k.on || []).join(' '), k.kun, k.en, k.meaning].join(' ').toLowerCase().indexOf(q) >= 0 ? 2 : 0);
+      return { k: k, m: m };
+    }).filter(function (x) { return x.m > 0; }).sort(function (a, b) { return b.m - a.m; }).slice(0, 6);
+    if (!hits.length) return '';
+    return '<h3>Kanji</h3><div class="vocab-card-grid">' + hits.map(function (x) {
+      var k = x.k;
+      return '<a class="vocab-card" href="kanji.html" style="text-decoration:none">' +
+        '<span class="vw jp" style="font-size:2rem">' + JL.esc(k.kanji) + '</span>' +
+        '<span class="vr jp">' + JL.esc(k.kun || (k.on || [])[0] || '') + '</span>' +
+        '<span class="vmn"><span class="jp">' + JL.esc(k.meaning || '') + '</span> ' + JL.esc(k.en || '') + '</span></a>';
+    }).join('') + '</div>';
+  }
+
+  function search() {
+    var q = document.getElementById('d-q').value.trim();
+    var el = document.getElementById('d-results');
+    var st = document.getElementById('d-status');
+    if (!q) { el.innerHTML = ''; st.textContent = 'Type a word to look it up.'; return; }
+    var ql = q.toLowerCase();
+    var scored = [];
+    VOCAB.forEach(function (v) {
+      var m = match(v, q) || match(v, ql);
+      if (m) scored.push({ v: v, m: m });
+    });
+    scored.sort(function (a, b) {
+      if (b.m !== a.m) return b.m - a.m;
+      var la = (a.v.level || 'N5') === curLvl ? 0 : 1, lb = (b.v.level || 'N5') === curLvl ? 0 : 1;
+      if (la !== lb) return la - lb;
+      return String(a.v.jp).length - String(b.v.jp).length;
+    });
+    var words = scored.slice(0, 30);
+    st.textContent = words.length ? (scored.length + ' match(es) — showing ' + words.length) : 'No matches. Try another spelling, or add the word in Add / Edit.';
+    el.innerHTML = words.map(function (x) { return card(x.v); }).join('') + kanjiCards(ql);
+    Array.prototype.forEach.call(el.querySelectorAll('[data-say]'), function (b) {
+      b.onclick = function () { JL.speak(b.dataset.say); };
+    });
+  }
+
+  document.getElementById('d-go').onclick = search;
+  document.getElementById('d-q').oninput = search;
+  document.getElementById('d-clear').onclick = function () {
+    document.getElementById('d-q').value = '';
+    document.getElementById('d-results').innerHTML = '';
+    document.getElementById('d-status').textContent = 'Type a word to look it up.';
+  };
+  document.getElementById('d-status').textContent = 'Type a word to look it up.';
+})();
+</script>
+</body>
+</html>

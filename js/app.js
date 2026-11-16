@@ -286,12 +286,14 @@ window.JL = (function () {
     return arr;
   }
   function pickN(arr, n) { return shuffle(arr).slice(0, n); }
-  function toast(msg) {
+  function toast(msg, kind) {
     var t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = msg;
+    t.className = 'toast' + (kind ? ' toast-' + kind : '');
+    var ic = kind === 'ok' ? '✓' : kind === 'warn' ? '⚠' : kind === 'err' ? '✕' : 'ℹ';
+    t.innerHTML = '<span class="toast-ic">' + ic + '</span><span>' + esc(msg) + '</span>';
     document.body.appendChild(t);
-    setTimeout(function () { t.remove(); }, 2200);
+    setTimeout(function () { t.classList.add('out'); }, 2400);
+    setTimeout(function () { if (t.parentNode) t.remove(); }, 2950);
   }
   function norm(s) {
     return String(s || '').replace(/[\s。、．.,\u3000?？!！'’“”"()（）]/g, '');
@@ -348,7 +350,7 @@ window.JL = (function () {
     var txt = String(text || '').trim();
     if (!txt) return false;
     if (location.protocol === 'file:' || noServerTTS || typeof fetch === 'undefined') { speakFallback(txt, rate); return true; }
-    /* Google text-to-speech via the app server, chunked at sentence boundaries */
+    /* Japanese speech via the app server, chunked at sentence boundaries */
     var chunks = txt.match(/[^。！？!?.]{1,150}([。！？!?.]+|$)/g) || [txt];
     var i = 0, failed = false;
     if (curAudio) { try { curAudio.pause(); } catch (e) {} curAudio = null; }
@@ -379,9 +381,7 @@ window.JL = (function () {
     return true;
   }
   function ttsBanner(id) {
-    var box = document.getElementById(id);
-    if (!box) return;
-    box.innerHTML = '<div class="notice">🔊 Audio: Google text-to-speech voice (with your device voice as backup). If a sound does not play, check your volume is on.</div>';
+    /* retired: audio just works — no Google-TTS notice is shown anymore */
   }
 
   /* ---------- navigation ---------- */
@@ -391,6 +391,7 @@ window.JL = (function () {
     { href: 'learn.html', icon: '🎯', label: 'Learn' },
     { href: 'kanji.html', icon: '漢', label: 'Kanji' },
     { href: 'vocab.html', icon: '語', label: 'Vocabulary' },
+    { href: 'dictionary.html', icon: '辞', label: 'Dictionary' },
     { href: 'write.html', icon: '✍️', label: 'Writing' },
     { href: 'kana.html', icon: 'あ', label: 'Kana' },
     { href: 'grammar.html', icon: '文', label: 'Grammar' },
@@ -720,7 +721,7 @@ window.JL = (function () {
     Promise.all(jobs).then(done, done);
   }
   function runScripts(scripts, i) {
-    if (i >= scripts.length) { JL.renderNav(); JL.initCatToggle(); JL.sync.pull(); return; }
+    if (i >= scripts.length) { JL.renderNav(); JL.initCatToggle(); JL.levelBar(); JL.sync.pull(); return; }
     var s = document.createElement('script');
     s.text = scripts[i];
     document.body.appendChild(s);
@@ -783,11 +784,13 @@ window.JL = (function () {
      created anywhere — e.g. a new kanji in chapter 16 — appears on every page.
      `count` = items of THIS kind in that chapter; chapter 0 ("Essential / my
      words") only shows on the kind that owns it. */
-  function chapters(kind) {
+  function chapters(kind, lvl) {
+    var LV = lvl || level();
     var seen = {}, out = [];
     ['kanji', 'vocab', 'grammar', 'sentences', 'tests'].forEach(function (k2) {
       merged(k2).forEach(function (it) {
         if (it == null) return;
+        if ((it.level || 'N5') !== LV) return;
         var n = (it.chapter != null) ? (Number(it.chapter) || 0) : ((k2 === kind) ? 0 : -1);
         if (n < 0) return;
         if (n === 0 && k2 !== kind) return;
@@ -798,12 +801,42 @@ window.JL = (function () {
     });
     (pref('uchapters') || []).forEach(function (c) {
       if (!c || c.n == null) return;
+      if ((c.lvl || 'N5') !== LV) return;
       var n = Number(c.n);
       if (!seen[n]) { seen[n] = { n: n, t: c.t || ('Chapter ' + n), count: 0 }; out.push(seen[n]); }
       else seen[n].t = c.t || seen[n].t;
     });
     out.sort(function (a, b) { return a.n - b.n; });
     return out;
+  }
+
+  /* ---------- JLPT levels (N5 … N1) — data items carry .level, default N5 ---------- */
+  var LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
+  function level() {
+    var l = pref('level');
+    return LEVELS.indexOf(l) >= 0 ? l : 'N5';
+  }
+  function setLevel(l) {
+    if (LEVELS.indexOf(l) < 0) return;
+    pref('level', l);
+    refreshPage(); /* re-run the current page with the new level's data */
+  }
+  function byLevel(arr) {
+    var l = level();
+    return (arr || []).filter(function (it) { return it && (it.level || 'N5') === l; });
+  }
+  /* every page that wants the level picker just includes <div id="level-bar"></div> */
+  function mountLevelBar() {
+    var el = document.getElementById('level-bar');
+    if (!el) return;
+    var cur = level();
+    el.className = 'level-bar';
+    el.innerHTML = '<span class="lb-label">JLPT</span>' + LEVELS.map(function (l) {
+      return '<button class="lvl-btn' + (l === cur ? ' active' : '') + '" data-lvl="' + l + '" title="Show ' + l + ' content">' + l + '</button>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.lvl-btn'), function (b) {
+      b.onclick = function () { if (b.dataset.lvl !== level()) setLevel(b.dataset.lvl); };
+    });
   }
 
   /* ---------- per-kanji memorization images (cloud-synced mapping kanjiId -> fileId) ---------- */
@@ -822,7 +855,8 @@ window.JL = (function () {
     quiz: quiz, flashcards: flashcards, pad: pad,
     files: { list: filesList, put: filePut, get: fileGet, del: fileDel, cat: fileCat },
     sync: { push: pushUserData, pull: pullUserData, live: startLiveSync },
-    pref: pref, chapters: chapters, kimg: { get: kimgGet, set: kimgSet }, mmfix: mmfixValue
+    pref: pref, chapters: chapters, kimg: { get: kimgGet, set: kimgSet }, mmfix: mmfixValue,
+    level: level, setLevel: setLevel, byLevel: byLevel, levelBar: mountLevelBar, LEVELS: LEVELS
   };
 })();
-document.addEventListener('DOMContentLoaded', function () { JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.sync.pull(); JL.sync.live(); });
+document.addEventListener('DOMContentLoaded', function () { JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.levelBar(); JL.sync.pull(); JL.sync.live(); });
