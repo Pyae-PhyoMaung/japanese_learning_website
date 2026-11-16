@@ -55,17 +55,20 @@
 <script src="js/app.js"></script>
 <script>
 (function(){
-  document.getElementById('lvl-title').textContent = JL.level();
-  var k = JL.byLevel(JL.data('kanji')).length,
-      v = JL.byLevel(JL.data('vocab')).length,
-      g = JL.byLevel(JL.data('grammar')).length,
-      s = JL.byLevel(JL.data('sentences')).length;
-  document.getElementById('stat-kanji').textContent = k;
-  document.getElementById('stat-vocab').textContent = v;
-  document.getElementById('stat-grammar').textContent = g;
-  document.getElementById('stat-sent').textContent = s;
-  var tests = (JSON.parse(localStorage.getItem('jl_user_v1')||'{}').tests||{added:[]}).added.length;
-  document.getElementById('stat-tests').textContent = tests;
+  function put(id, n) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = n;
+  }
+  function safeLen(kind) {
+    try { return JL.byLevel(JL.data(kind)).length; }
+    catch (e) { return 0; }
+  }
+  try { document.getElementById('lvl-title').textContent = JL.level(); } catch (e) {}
+  put('stat-kanji', safeLen('kanji'));
+  put('stat-vocab', safeLen('vocab'));
+  put('stat-grammar', safeLen('grammar'));
+  put('stat-sent', safeLen('sentences'));
+  put('stat-tests', safeLen('tests'));
 })();
 </script>
 </body>

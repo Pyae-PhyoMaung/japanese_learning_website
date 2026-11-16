@@ -159,6 +159,37 @@
       return '<option value="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + '</option>';
     }).join('');
   }
+  /* level / chapter pickers for the quiz & deck builders */
+  function lvlOpts(cur) {
+    return JL.LEVELS.map(function (l) {
+      return '<option value="' + l + '"' + (l === (cur || JL.level()) ? ' selected' : '') + '>' + l + '</option>';
+    }).join('');
+  }
+  function chOptsAll(cur, lv) {
+    var chs = JL.chapters('vocab', lv).filter(function (c) { return c.n > 0; });
+    return '<option value="">All chapters</option>' + chs.map(function (c) {
+      return '<option value="' + c.n + '"' + (Number(cur) === c.n ? ' selected' : '') + '>' + c.n + '章 ' + JL.esc(c.t) + '</option>';
+    }).join('');
+  }
+  /* read the JLPT level + chapter/session out of a natural-language request */
+  function parseSpec(text) {
+    var t = String(text || '');
+    var lv = (t.match(/\bN([1-5])\b/i) || [])[0];
+    var cm = t.match(/(?:chapter|session|lesson)\s*#?\s*([0-9]+)/i);
+    return { level: lv ? lv.toUpperCase() : '', chapter: cm ? Number(cm[1]) : null };
+  }
+  function inLevel(arr, lv) {
+    var L = lv || JL.level();
+    return (arr || []).filter(function (it) { return it && (it.level || 'N5') === L; });
+  }
+  /* strip “of chapter 3 / level N5” wording out of a requested title */
+  function cleanTitle(rest) {
+    return String(rest || '')
+      .replace(/\s*\b(?:level|for)\s*N[1-5]\b/ig, '')
+      .replace(/\s*\b(?:chapter|session|lesson)\s*#?\s*[0-9]+/ig, '')
+      .replace(/\b(?:of|with|from|on)\b/ig, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
   function chTitle(n) {
     var c = JL.chapters('vocab').filter(function (x) { return x.n === n; })[0];
     return c ? c.t : ('Chapter ' + n);
@@ -185,30 +216,51 @@
   }
 
   function showQuizForm(rest) {
+    var sp = parseSpec(rest);
     var f = '<div class="pf" data-kind="quiz">' +
       '<b>➕ Make a quiz</b>' +
-      '<div class="pf-row"><input data-f="title" placeholder="Quiz title *" value="' + JL.esc(rest || '') + '" style="flex:1"></div>' +
+      '<div class="pf-row"><input data-f="title" placeholder="Quiz title *" value="' + JL.esc(cleanTitle(rest)) + '" style="flex:1"></div>' +
       '<div class="pf-row"><select data-f="src">' +
       '<option value="vocab">Vocabulary — which word matches the meaning?</option>' +
       '<option value="kanji">Kanji — which kanji matches the meaning?</option>' +
       '<option value="grammar">Grammar — mixed exercises</option>' +
-      '</select><select data-f="chapter">' + chOpts() + '</select></div>' +
+      '</select><select data-f="level">' + lvlOpts(sp.level) + '</select></div>' +
+      '<div class="pf-row"><select data-f="chapter">' + chOptsAll(sp.chapter, sp.level) + '</select></div>' +
       '<div class="pf-row"><input data-f="count" type="number" min="3" max="20" value="10" style="width:90px"> <span class="muted small">questions</span></div>' +
       '<button class="btn small primary" data-do="quiz">💾 Save quiz</button>' +
-      '<span class="muted small">Saved to <a href="tests.html">My tests</a> — take it anytime.</span></div>';
+      '<span class="muted small">Saved to <a href="tests.html">My tests</a> — take it anytime. Say “list my tests” to take, rename or delete it here.</span></div>';
+    reply(f);
+  }
+  function showDeckForm(rest) {
+    var sp = parseSpec(rest);
+    var f = '<div class="pf" data-kind="deck">' +
+      '<b>➕ Make a flashcard deck</b>' +
+      '<div class="pf-row"><input data-f="title" placeholder="Deck title *" value="' + JL.esc(cleanTitle(rest)) + '" style="flex:1"></div>' +
+      '<div class="pf-row"><select data-f="src">' +
+      '<option value="vocab">Vocabulary — Japanese ⇄ meaning</option>' +
+      '<option value="kanji">Kanji — character ⇄ reading &amp; meaning</option>' +
+      '<option value="sentences">Listening sentences — Japanese ⇄ meaning</option>' +
+      '<option value="grammar">Grammar — example sentences</option>' +
+      '</select><select data-f="level">' + lvlOpts(sp.level) + '</select></div>' +
+      '<div class="pf-row"><select data-f="chapter">' + chOptsAll(sp.chapter, sp.level) + '</select></div>' +
+      '<div class="pf-row"><input data-f="count" type="number" min="3" max="40" value="15" style="width:90px"> <span class="muted small">cards</span></div>' +
+      '<button class="btn small primary" data-do="deck">💾 Save deck</button>' +
+      '<span class="muted small">Saved to <a href="tests.html">My tests</a> — study it anytime.</span></div>';
     reply(f);
   }
 
-  function buildQuizQuestions(src, ch, n) {
+  function buildQuizQuestions(src, ch, n, lv) {
     var inCh = function (x) { return !ch || Number(x.chapter != null ? x.chapter : 0) === ch; };
     if (src === 'grammar') {
       var ex = [];
-      JL.data('grammar').filter(inCh).forEach(function (g) {
-        ((g.exercises || g.ex) || []).forEach(function (e) { ex.push({ q: e.q, opts: e.opts, ans: e.ans }); });
+      inLevel(JL.data('grammar'), lv).filter(inCh).forEach(function (g) {
+        ((g.exercises || g.ex) || []).forEach(function (e) {
+          if (e && e.opts && typeof e.ans === 'number') ex.push({ q: e.q, opts: e.opts, ans: e.ans });
+        });
       });
       return JL.pickN(ex, n);
     }
-    var pool = JL.data(src === 'kanji' ? 'kanji' : 'vocab').filter(inCh);
+    var pool = inLevel(JL.data(src === 'kanji' ? 'kanji' : 'vocab'), lv).filter(inCh);
     if (pool.length < 4) return null;
     return JL.pickN(pool, n).map(function (it) {
       var key = src === 'kanji' ? 'kanji' : 'jp';
@@ -216,6 +268,72 @@
       var opts = JL.shuffle([it[key]].concat(wrongs.map(function (w) { return w[key]; })));
       return { q: 'Which ' + src + ' means “' + JL.esc(it.en || it.meaning || it.mm || '') + '”?', opts: opts, ans: opts.indexOf(it[key]), say: it[key] };
     });
+  }
+  function buildDeckCards(src, ch, n, lv) {
+    var inCh = function (x) { return !ch || Number(x.chapter != null ? x.chapter : 0) === ch; };
+    var pool = inLevel(JL.data(src), lv).filter(inCh);
+    if (!pool.length) return null;
+    if (src === 'kanji') {
+      return JL.pickN(pool, n).map(function (k) {
+        return { front: '<span style="font-size:2.4rem">' + JL.esc(k.kanji) + '</span>',
+          back: '<b class="jp">' + JL.esc(k.kun || (k.on || [])[0] || '') + '</b><br><span class="small">' + JL.esc(k.en || '') + '</span>' +
+            (k.meaning ? '<br><span class="jp small muted">' + JL.esc(k.meaning) + '</span>' : ''),
+          say: k.kanji };
+      });
+    }
+    if (src === 'vocab') {
+      return JL.pickN(pool, n).map(function (v) {
+        return { front: '<span class="jp" style="font-size:1.6rem">' + JL.esc(v.jp) + '</span>',
+          back: JL.esc(v.en || v.mm || '') + '<div class="small muted">' + JL.esc(v.jp + ' · ' + (v.rd || '')) + '</div>',
+          say: v.jp };
+      });
+    }
+    if (src === 'grammar') {
+      var cards = [];
+      pool.forEach(function (g) {
+        (g.examples || []).forEach(function (e) {
+          if (e && e.jp) cards.push({ front: '<span class="jp">' + JL.esc(e.jp) + '</span>',
+            back: JL.esc(e.en || '') + '<div class="small muted">' + JL.esc(e.rd || '') + ' · ' + JL.esc(g.title || '') + '</div>', say: e.jp });
+        });
+      });
+      return cards.length ? JL.pickN(cards, n) : null;
+    }
+    return JL.pickN(pool, n).map(function (s) {
+      return { front: '<span class="jp">' + JL.esc(s.jp) + '</span>', back: JL.esc(s.en || '') + '<div class="small muted">' + JL.esc(s.rd || '') + '</div>', say: s.jp };
+    });
+  }
+
+  /* ---------- CRUD over your saved tests & decks ---------- */
+  function findTest(name) {
+    var n = String(name || '').trim().toLowerCase();
+    return JL.data('tests').filter(function (t) { return t && t.title && t.title.toLowerCase().indexOf(n) >= 0; });
+  }
+  function listMyTests() {
+    var all = JL.data('tests');
+    if (!all.length) { reply('You have no saved tests or decks yet — say <b>add quiz</b> or <b>make me a flashcard deck</b> and I’ll build one with you.'); return; }
+    reply('<b>Your tests &amp; decks (' + all.length + '):</b><br>' + all.map(function (t) {
+      var cnt = (t.type === 'deck') ? ((t.cards || []).length + ' cards') : ((t.questions || []).length + ' questions');
+      return '<div style="margin:6px 0">• <b>' + JL.esc(t.title) + '</b> <span class="muted small">' +
+        (t.type === 'deck' ? 'Deck' : 'Quiz') + ' · ' + cnt + (t.chapter ? ' · ch ' + t.chapter : '') + ' · ' + (t.level || 'N5') + '</span><br>' +
+        '<button class="btn small primary" data-tact="take" data-tid="' + JL.esc(t.id) + '">▶ Take</button> ' +
+        '<button class="btn small ghost" data-tact="ren" data-tid="' + JL.esc(t.id) + '">✏️ Rename</button> ' +
+        '<button class="btn small ghost" data-tact="del" data-tid="' + JL.esc(t.id) + '">🗑 Delete</button></div>';
+    }).join(''));
+  }
+  function deleteTest(name) {
+    var hits = findTest(name);
+    if (!hits.length) { reply('I couldn’t find a test or deck called “' + JL.esc(name) + '” — say <b>list my tests</b> to see what you have.'); return; }
+    if (hits.length > 1) { reply('I found ' + hits.length + ' with a similar name — be more specific: ' + hits.map(function (t) { return '<b>' + JL.esc(t.title) + '</b>'; }).join(', ') + '.'); return; }
+    JL.remove('tests', hits[0].id);
+    reply('🗑 Deleted <b>' + JL.esc(hits[0].title) + '</b>.');
+  }
+  function renameTest(name, newName) {
+    var hits = findTest(name);
+    if (!hits.length) { reply('I couldn’t find a test or deck called “' + JL.esc(name) + '”.'); return; }
+    if (hits.length > 1) { reply('Several match that name — be more specific: ' + hits.map(function (t) { return '<b>' + JL.esc(t.title) + '</b>'; }).join(', ') + '.'); return; }
+    hits[0].title = String(newName || '').trim() || hits[0].title;
+    JL.save('tests', hits[0]);
+    reply('✏️ Renamed to <b>' + JL.esc(hits[0].title) + '</b>.');
   }
 
   function doAdd(what, v) {
@@ -259,26 +377,61 @@
     Array.prototype.forEach.call(root.querySelectorAll('[data-do]'), function (b) {
       b.onclick = function () {
         var box = b.closest('.pf');
-        var g = function (n) {
-          var e = box.querySelector('[data-f="' + n + '"]');
-          return e ? String(e.value || '').trim() : '';
-        };
-        if (b.dataset.do === 'quiz') {
+         var g = function (n) {
+           var e = box.querySelector('[data-f="' + n + '"]');
+           return e ? String(e.value || '').trim() : '';
+         };
+        if (b.dataset.do === 'quiz' || b.dataset.do === 'deck') {
+          var isDeck = b.dataset.do === 'deck';
           var title = g('title');
-          if (!title) { JL.toast('Give the quiz a title first.'); return; }
-          var qch = parseInt(g('chapter'), 10) || 0;
-          var nQ = Math.max(3, Math.min(20, parseInt(g('count'), 10) || 10));
-          var qs = buildQuizQuestions(g('src'), qch, nQ);
-          if (!qs || !qs.length) { reply('Not enough material for that quiz — try another source or chapter.'); return; }
-          JL.save('tests', { id: uid2(), type: 'quiz', title: title, questions: qs, chapter: qch || undefined, chapterTitle: qch ? chTitle(qch) : '' });
-          reply('✅ Quiz <b>' + JL.esc(title) + '</b> saved — ' + qs.length + ' questions' + (qch ? ' from chapter ' + qch + ' (' + JL.esc(chTitle(qch)) + ')' : '') +
-            '. Take it on the <a href="tests.html">Tests page</a> · <a href="edit.html">edit it</a>');
+          if (!title) { JL.toast('Give it a title first.'); return; }
+          var lv = g('level') || JL.level();
+          var ch = parseInt(g('chapter'), 10) || 0;
+          var nQ = Math.max(3, Math.min(isDeck ? 40 : 20, parseInt(g('count'), 10) || (isDeck ? 15 : 10)));
+          var built = isDeck ? buildDeckCards(g('src'), ch, nQ, lv) : buildQuizQuestions(g('src'), ch, nQ, lv);
+          if (!built || !built.length) { reply('Not enough material for that — try another source, level or chapter.'); return; }
+          JL.save('tests', { id: uid2(), type: isDeck ? 'deck' : 'quiz', title: title, questions: isDeck ? undefined : built, cards: isDeck ? built : undefined, chapter: ch || undefined, chapterTitle: ch ? chTitle(ch) : '', level: lv });
+          reply('✅ ' + (isDeck ? 'Deck' : 'Quiz') + ' <b>' + JL.esc(title) + '</b> saved — ' + built.length + (isDeck ? ' cards' : ' questions') +
+            (ch ? ' from chapter ' + ch + ' (' + JL.esc(chTitle(ch)) + ')' : '') + ' · level ' + lv +
+            '. Take it on the <a href="tests.html">Tests page</a>, or say <b>list my tests</b> to take it right here.');
           return;
         }
-        doAdd(b.dataset.do, { jp: g('jp'), kanji: g('jp'), rd: g('rd'), on: g('on'), kun: g('kun'), en: g('en'), mm: g('mm'), chapter: parseInt(g('chapter'), 10) || 0 });
+         doAdd(b.dataset.do, { jp: g('jp'), kanji: g('jp'), rd: g('rd'), on: g('on'), kun: g('kun'), en: g('en'), mm: g('mm'), chapter: parseInt(g('chapter'), 10) || 0 });
+       };
+     });
+    /* take / rename / delete your saved tests & decks right from the chat */
+    Array.prototype.forEach.call(root.querySelectorAll('[data-tact]'), function (b) {
+      b.onclick = function () {
+        var t = JL.data('tests').find(function (x) { return x && x.id === b.dataset.tid; });
+        if (!t) { reply('That test no longer exists — say <b>list my tests</b>.'); return; }
+        if (b.dataset.tact === 'del') {
+          if (!confirm('Delete “' + t.title + '"?')) return;
+          JL.remove('tests', t.id);
+          reply('🗑 Deleted <b>' + JL.esc(t.title) + '</b>.');
+          return;
+        }
+        if (b.dataset.tact === 'ren') {
+          var nn = prompt('New title for “' + t.title + '":', t.title);
+          if (!nn || !nn.trim()) return;
+          t.title = nn.trim();
+          JL.save('tests', t);
+          reply('✏️ Renamed to <b>' + JL.esc(t.title) + '</b>.');
+          return;
+        }
+        showTyping();
+        setTimeout(function () {
+          hideTyping();
+          var holder = bubble('bot', '▶ <b>' + JL.esc(t.title) + '</b><div id="pq"></div>', { quiz: t.title });
+          if (t.type === 'deck') {
+            JL.flashcards(holder.querySelector('#pq'), (t.cards || []).map(function (c) { return { front: c.front, back: c.back, say: c.say }; }), { title: t.title });
+          } else {
+            JL.quiz(holder.querySelector('#pq'), (t.questions || []).map(function (qq) { return { q: qq.q, opts: qq.opts, ans: qq.ans, say: qq.say, note: qq.note }; }), { title: t.title });
+          }
+          chat.scrollTop = chat.scrollHeight;
+        }, 350);
       };
     });
-  }
+   }
 
   function vocabCard(v) {
     return '<div class="jp"><b>' + JL.esc(v.jp) + '</b> (' + JL.esc(v.rd || '') + ')</div>' +
@@ -292,7 +445,7 @@
     function after(html) { reply(html); }
 
     if (ql === 'help' || ql === 'what can you do') {
-      after('I can:<br>• Look up words — “meaning of 食べる” or “tabemono”<br>• Show a kanji — “kanji 雨”<br>• Find grammar — “grammar てください”<br>• Quiz you — “quiz me on kanji / vocab / grammar”<br>• Random study items — “random word” / “random kanji”<br>• Counts — “how many kanji”<br>• List your uploaded files — “my files”<br>• <b>Add content for you</b> — “add vocab”, “add kanji”, “add sentence”, “add quiz” (I save it to your data, so it shows on the other pages)<br>• Remember our conversation — old chats are in the list at the top');
+      after('I can:<br>• Look up words — “meaning of 食べる” or “tabemono”<br>• Show a kanji — “kanji 雨”<br>• Find grammar — “grammar てください”<br>• Quiz you — “quiz me on kanji / vocab / grammar” (optionally “of chapter 3” or “N5”)<br>• Random study items — “random word” / “random kanji”<br>• Counts — “how many kanji”<br>• List your uploaded files — “my files”<br>• <b>Build study methods for you</b> — “add quiz”, “make me a flashcard deck with kanji of chapter 3 level N5”, “add vocab”, “add kanji”, “add sentence”<br>• <b>Manage your tests &amp; decks</b> — “list my tests”, then take / rename / delete them right here<br>• Remember our conversation — old chats are in the list at the top');
       return;
     }
     if (ql.indexOf('how many') >= 0) {
@@ -312,24 +465,30 @@
       return;
     }
     if (ql.indexOf('quiz me') >= 0 || ql.indexOf('test me') >= 0) {
+      var sp = parseSpec(q);
+      var inChQ = function (x) { return !sp.chapter || Number(x.chapter != null ? x.chapter : 0) === sp.chapter; };
       var kind = ql.indexOf('kanji') >= 0 ? 'kanji' : (ql.indexOf('grammar') >= 0 ? 'grammar' : 'vocab');
       var items = [];
       if (kind === 'kanji') {
-        var pool = JL.pickN(JL.data('kanji'), 5);
-        items = pool.map(function (kk) {
-          var wrongs = JL.pickN(JL.data('kanji').filter(function (x) { return x.kanji !== kk.kanji; }), 3);
+        var kpool = inLevel(JL.data('kanji'), sp.level).filter(inChQ);
+        if (kpool.length < 4) { after('Not enough kanji for that level/chapter — try “quiz me on kanji” without a chapter filter.'); return; }
+        kpool = JL.pickN(kpool, 5);
+        items = kpool.map(function (kk) {
+          var wrongs = JL.pickN(kpool.filter(function (x) { return x.kanji !== kk.kanji; }), 3);
           var opts = JL.shuffle([kk.kanji].concat(wrongs.map(function (w) { return w.kanji; })));
           return { q: 'Which kanji means “' + JL.esc(kk.en || kk.meaning || '') + '”?', opts: opts, ans: opts.indexOf(kk.kanji), say: kk.kanji };
         });
       } else if (kind === 'grammar') {
-        JL.data('grammar').forEach(function (g) {
-          ((g.exercises || g.ex) || []).forEach(function (e) { items.push({ q: e.q || e.s, opts: e.opts, ans: e.ans, note: JL.esc(g.title) }); });
+        inLevel(JL.data('grammar'), sp.level).filter(inChQ).forEach(function (g) {
+          ((g.exercises || g.ex) || []).forEach(function (e) { if (e && e.opts && typeof e.ans === 'number') items.push({ q: e.q || e.s, opts: e.opts, ans: e.ans, note: JL.esc(g.title) }); });
         });
         items = JL.pickN(items, 5);
       } else {
-        var vpool = JL.pickN(JL.data('vocab'), 5);
+        var vpool = inLevel(JL.data('vocab'), sp.level).filter(inChQ);
+        if (!vpool.length) { after('No vocabulary found for that level/chapter.'); return; }
+        vpool = JL.pickN(vpool, 5);
         items = vpool.map(function (vv) {
-          var wrongs = JL.pickN(JL.data('vocab').filter(function (x) { return x.jp !== vv.jp; }), 3);
+          var wrongs = JL.pickN(vpool.filter(function (x) { return x.jp !== vv.jp; }), 3);
           var opts = JL.shuffle([vv.jp].concat(wrongs.map(function (w) { return w.jp; })));
           return { q: 'Which word means “' + JL.esc(vv.en || vv.mm || '') + '”?', opts: opts, ans: opts.indexOf(vv.jp), say: vv.jp };
         });
@@ -344,13 +503,24 @@
       }, 350);
       return;
     }
+    /* study-method CRUD: tests, quizzes & flashcard decks from the chat */
+    var dm = q.match(/^delete\s+(?:my\s+)?(?:test|quiz|deck)\s+([\s\S]+)$/i);
+    if (dm) { deleteTest(dm[1].trim()); return; }
+    var rm2 = q.match(/^rename\s+(?:my\s+)?(?:test|quiz|deck)\s+([\s\S]+?)\s+to\s+([\s\S]+)$/i);
+    if (rm2) { renameTest(rm2[1].trim(), rm2[2].trim()); return; }
+    if (/\b(?:list|show)\b.*\b(?:tests?|quizzes|decks?)\b/.test(ql) || ql === 'my tests' || ql === 'my decks') { listMyTests(); return; }
     /* add-commands: create content on the other pages straight from the chat */
-    var am = q.match(/^add\s+([a-z]+)\s*([\s\S]*)$/i) || q.match(/^(?:make|create)\s+(?:me\s+)?(?:a\s+)?(?:quiz|test)\s*([\s\S]*)$/i);
+    var dkm = q.match(/^(?:make|create)\s+(?:me\s+)?(?:a\s+)?(?:flash\s*-?\s*cards?(?:\s*deck)?|card\s*deck|deck)s?\s*([\s\S]*)$/i);
+    if (dkm) { showDeckForm(dkm[1] || ''); return; }
+    var qmk = q.match(/^(?:make|create)\s+(?:me\s+)?(?:a\s+)?(?:quiz|test)\b\s*([\s\S]*)$/i);
+    if (qmk) { showQuizForm(qmk[1].trim()); return; }
+    var am = q.match(/^add\s+([a-z]+)\s*([\s\S]*)$/i);
     if (am) {
-      var what = (am[1] || 'quiz').toLowerCase().replace(/s$/, '');
+      var what = am[1].toLowerCase().replace(/s$/, '');
       var rest = (am[2] || '').trim();
       if (what === 'vocabulary') what = 'vocab';
       if (what === 'listening') what = 'sentence';
+      if (what === 'deck' || what === 'flashcard' || what === 'flash' || what === 'card') { showDeckForm(rest); return; }
       if (what === 'quiz' || what === 'test') { showQuizForm(rest); return; }
       if (what === 'vocab' || what === 'kanji' || what === 'sentence') {
         if (rest.indexOf('|') >= 0) { quickAdd(what, rest); return; }
@@ -359,8 +529,8 @@
       }
       if (what === 'grammar') { after('Grammar points have many fields (examples, exercises…) — add them on the <a href="edit.html">Add / Edit → Grammar</a> page.'); return; }
     }
-    if (/^(edit|delete|remove|update)/.test(ql)) {
-      after('I can <b>add</b> things right here — try “add vocab”, “add kanji”, “add sentence” or “add quiz”. For editing or deleting, use the <a href="edit.html">Add / Edit</a> page.');
+    if (/^(edit|delete|remove|update)\b/.test(ql)) {
+      after('I can <b>add</b> things right here — “add vocab”, “add kanji”, “add sentence”, “add quiz”, “make me a flashcard deck” — and manage your study methods: say <b>list my tests</b> to take, rename or delete your quizzes and decks from this chat. For editing book entries, use the <a href="edit.html">Add / Edit</a> page.');
       return;
     }
     if (ql.indexOf('my files') >= 0 || ql.indexOf('uploaded') >= 0) {
@@ -421,7 +591,12 @@
     inp.value = '';
     if (cur && cur.title === 'New chat') cur.title = q.slice(0, 40);
     bubble('user', JL.esc(q));
-    answer(q);
+    try {
+      answer(q);
+    } catch (e) {
+      try { if (window.console && console.error) console.error('Study Partner error:', e); } catch (e2) {}
+      reply('⚠️ Sorry — something went wrong while answering. Your saved data may be from an older version of the site; it was repaired automatically — please send your message again.');
+    }
   }
   document.getElementById('p-send').onclick = send;
   document.getElementById('p-in').addEventListener('keydown', function (e) {
@@ -429,7 +604,7 @@
   });
 
   /* suggestion chips */
-  var SUGGS = ['meaning of 食べる', 'quiz me on vocab', 'add vocab', 'add kanji', 'add sentence', 'add quiz', 'random kanji', 'my files', 'help'];
+  var SUGGS = ['meaning of 食べる', 'quiz me on vocab', 'make me a flashcard deck', 'add quiz', 'list my tests', 'add vocab', 'add kanji', 'add sentence', 'random kanji', 'my files', 'help'];
   function renderChips() {
     var box = document.getElementById('p-sugg');
     box.innerHTML = SUGGS.map(function (s) { return '<button class="sugg" data-s="' + JL.esc(s) + '">' + JL.esc(s) + '</button>'; }).join('');
@@ -461,7 +636,7 @@
     if (!cur.msgs.length) bubble('bot', GREETING);
   };
 
-  var GREETING = 'こんにちは！I’m your study partner. Try: <b>meaning of 食べる</b>, <b>kanji 雨</b>, <b>quiz me on kanji</b>, <b>add vocab</b>, <b>add quiz</b>, or <b>help</b>. Everything you add here shows up on the other pages.';
+  var GREETING = 'こんにちは！I’m your study partner. Try: <b>meaning of 食べる</b>, <b>quiz me on kanji</b>, <b>make me a flashcard deck with vocab of chapter 3</b>, <b>add vocab</b>, <b>list my tests</b>, or <b>help</b>. Everything you add here shows up on the other pages.';
 
   loadChats();
   renderChatList();

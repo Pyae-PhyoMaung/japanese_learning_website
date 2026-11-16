@@ -122,17 +122,66 @@ window.JL = (function () {
     return u;
   }
 
-  /* merge base + user layer */
+  /* merge base + user layer — defensive against corrupt or legacy saved
+     data: a broken store shape (null added/edited/deleted, old array format,
+     null entries) must never crash a page; bad parts are ignored */
+  function normStore(u) {
+    if (!u || typeof u !== 'object' || Array.isArray(u)) return null;
+    return u;
+  }
   function merged(kind) {
-    var u = getUser()[kind] || {};
+    var raw = getUser()[kind];
+    var u = normStore(raw);
+    if (!u) { u = (Array.isArray(raw)) ? { added: raw } : {}; }
+    var del = (u.deleted && typeof u.deleted === 'object' && !Array.isArray(u.deleted) && u.deleted) || {};
+    var ed = (u.edited && typeof u.edited === 'object' && !Array.isArray(u.edited) && u.edited) || {};
     var out = [];
     (base[kind] || []).forEach(function (it) {
-      if (u.deleted && u.deleted[it.id]) return;
-      var e = (u.edited && u.edited[it.id]) || null;
-      out.push(e ? Object.assign({}, it, e) : it);
+      if (!it || it.id == null) return;
+      if (del[it.id]) return;
+      var e = ed[it.id];
+      out.push((e && typeof e === 'object') ? Object.assign({}, it, e) : it);
     });
-    (u.added || []).forEach(function (it) { out.push(it); });
+    (Array.isArray(u.added) ? u.added : []).forEach(function (it) {
+      if (it && typeof it === 'object') out.push(it);
+    });
     return out;
+  }
+  /* one-time repair of saved user data (any shape damage from older site
+     versions): rebuilds each store as {added:[valid], edited:{}, deleted:{}},
+     rescuing an old array-format store as `added`, then pushes the repaired
+     copy to the cloud so every device gets the fix */
+  function migrateShape() {
+    try {
+      if (localStorage.getItem('jl_shapefix_v1')) return;
+      localStorage.setItem('jl_shapefix_v1', '1');
+      var u = getUser(), changed = false;
+      ['kanji', 'vocab', 'grammar', 'sentences', 'tests'].forEach(function (k) {
+        var s = u[k];
+        var fixed;
+        if (Array.isArray(s)) {
+          fixed = { added: s.filter(function (it) { return it && typeof it === 'object'; }), edited: {}, deleted: {} };
+        } else if (!s || typeof s !== 'object') {
+          fixed = { added: [], edited: {}, deleted: {} };
+        } else {
+          fixed = {
+            added: (Array.isArray(s.added) ? s.added : []).filter(function (it) { return it && typeof it === 'object'; }),
+            edited: (s.edited && typeof s.edited === 'object' && !Array.isArray(s.edited)) ? s.edited : {},
+            deleted: (s.deleted && typeof s.deleted === 'object' && !Array.isArray(s.deleted)) ? s.deleted : {}
+          };
+          var clean = {};
+          Object.keys(fixed.edited).forEach(function (id) { if (fixed.edited[id] && typeof fixed.edited[id] === 'object') clean[id] = fixed.edited[id]; });
+          fixed.edited = clean;
+          clean = {};
+          Object.keys(fixed.deleted).forEach(function (id) { if (fixed.deleted[id]) clean[id] = fixed.deleted[id]; });
+          fixed.deleted = clean;
+        }
+        if (JSON.stringify(u[k]) !== JSON.stringify(fixed)) { u[k] = fixed; changed = true; }
+      });
+      if (u.files && !Array.isArray(u.files.added)) { u.files = { added: (u.files && Array.isArray(u.files)) ? u.files : [] }; changed = true; }
+      else if (Array.isArray(u.files)) { u.files = { added: u.files.filter(function (m) { return m && typeof m === 'object'; }) }; changed = true; }
+      if (changed) setUser(u);
+    } catch (e) {}
   }
   /* ---------- Myanmar (Burmese) text: always store real Unicode, never Zawgyi ---------- */
   /* js/zg2uni.js is a vendored copy of Google's myanmar-tools (Zawgyi detector + converter).
@@ -223,6 +272,7 @@ window.JL = (function () {
     } catch (e) {}
   }
   function loadZg() {
+    migrateShape();
     migrateChapters();
     if (window.JL_ZG) { migrateZg(); return; }
     var s = document.createElement('script');

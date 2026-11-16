@@ -205,7 +205,7 @@
       '<h2 class="jp" style="font-size:2.6rem;text-align:center">' + JL.esc(k.kanji) + '</h2>' +
       '<p style="text-align:center">' +
       '<span class="pattern">音 ' + JL.esc((k.on || []).join(' · ')) + '</span> ' +
-      '<span class="pattern" style="background:var(--accent)">訓 ' + JL.esc(k.kun || '—') + '</span></p>' +
+      '<span class="pattern" style="background:var(--accent-soft);color:var(--ink);border:1px solid var(--accent)">訓 ' + JL.esc(k.kun || '—') + '</span></p>' +
       '<p style="text-align:center"><b>' + JL.esc(k.en) + '</b>' + (k.meaning ? ' · <span class="jp">' + JL.esc(k.meaning) + '</span>' : '') + '</p>' +
       '<div style="text-align:center;margin:6px 0 10px">' +
       '<button class="btn" data-say="' + JL.esc(k.kanji) + '">🔊 Listen to the kanji</button> ' +
