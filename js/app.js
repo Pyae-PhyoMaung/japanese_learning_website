@@ -605,7 +605,8 @@ window.JL = (function () {
       { href: 'dictionary.html', icon: '辞', label: 'Dictionary' },
       { href: 'textbook.html', icon: '📖', label: 'Library' },
       { href: 'files.html', icon: '🗂️', label: 'Files' },
-      { href: 'partner.html', icon: '🤝', label: 'Study Partner' }
+      { href: 'partner.html', icon: '🤝', label: 'Study Partner' },
+      { href: 'board.html', icon: '📌', label: 'Cardboard' }
     ] }
   ];
   function renderNav() {
@@ -1150,7 +1151,19 @@ window.JL = (function () {
     'Home': 'ပင်မ', 'Library': 'စာကြည့်တိုက်', 'Learn': 'လေ့လာ', 'Kanji': 'ခန်းဂျိ',
     'Vocabulary': 'စကားလုံးများ', 'Dictionary': 'အဘိဓာန်', 'Writing': 'စာရေးမည်', 'Kana': 'ကာန',
     'Grammar': 'သဒ္ဒါ', 'Listening': 'နားထောင်မည်', 'Tests': 'စာမေးပွဲများ', 'Practice': 'လေ့ကျင့်ခန်း', 'Tools': 'ကိရိယာများ', 'Files': 'ဖိုင်များ',
-    'Study Partner': 'လေ့လာရေးအဖော်', 'Add / Edit': 'ထည့်ရန် / ပြင်ရန်', 'More': 'နောက်ထပ်', 'Close': 'ပိတ်မည်',
+    'Study Partner': 'လေ့လာရေးအဖော်',
+    'Cardboard': 'ကတ်ထူ',
+    'Cardboard History': 'ကတ်ထူ မှတ်တမ်း',
+    'Upcoming': 'လာမည့် တာဝန်များ',
+    'Finished': 'ပြီးစီးပြီး',
+    'What needs doing?': 'ဘာလုပ်ရမလဲ?',
+    'Today': 'ဒီနေ့',
+    'Overdue': 'ရက်လွန်',
+    'Someday': 'အချိန်မရွေး',
+    'No tasks yet — pin your first one!': 'တာဝန် ဘာမှ မရှိသေးပါ — ပင်တပ်လိုက်ပါ!',
+    'Nothing finished yet.': 'မပြီးစီးရသေးပါ။',
+    'Pin tasks to plan, finish them, and look back on what you did.': 'လုပ်ရမည့် တာဝန်များကို ပင်တပ်ထားပြီး ပြီးမြောက်သည့်အခါ မှတ်တမ်းတင်ပါ။',
+    'Type a task first.': 'တာဝန် ရိုက်ထည့်ပါ။', 'Add / Edit': 'ထည့်ရန် / ပြင်ရန်', 'More': 'နောက်ထပ်', 'Close': 'ပိတ်မည်',
     'All': 'အားလုံး', 'All chapters': 'အခန်းအားလုံး', 'All kanji': 'ခန်းဂျိ အားလုံး',
     'All words': 'စကားလုံး အားလုံး', 'All sentences': 'ဝါကျအားလုံး', 'All grammar': 'သဒ္ဒါအားလုံး',
     'All levels': 'အဆင့်အားလုံး', 'Chapters': 'အခန်းများ', 'Level': 'အဆင့်', 'Title': 'ခေါင်းစဉ်',

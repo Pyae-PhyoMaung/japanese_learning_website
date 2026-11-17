@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cardboard History | Japanese Learning</title>
+<script>try{if(localStorage.getItem('jl_theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ---- corkboard ---- */
+  .board {
+    background-color:#c99e6a;
+    background-image:
+      radial-gradient(rgba(112,66,25,.28) 1.4px, transparent 1.5px),
+      radial-gradient(rgba(255,236,200,.30) 1.4px, transparent 1.5px),
+      linear-gradient(rgba(0,0,0,.05), rgba(0,0,0,.10));
+    background-size:19px 19px, 27px 27px, 100% 100%;
+    background-position:0 0, 10px 14px, 0 0;
+    border:12px solid #a9743f;
+    border-radius:22px;
+    padding:22px 22px 26px;
+    box-shadow:var(--shadow), inset 0 0 46px rgba(60,30,5,.28);
+  }
+  .board h3 {
+    color:#fff8ec; text-shadow:0 1px 2px rgba(0,0,0,.45);
+    margin:4px 4px 16px; font-size:1.06rem; letter-spacing:.4px;
+  }
+  .board h3 .cnt { opacity:.8; font-weight:400; font-size:.85rem; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media (max-width:820px){ .cols { grid-template-columns:1fr; } }
+
+  /* ---- pinned paper notes ---- */
+  .notes { display:grid; grid-template-columns:repeat(auto-fill, minmax(172px, 1fr)); gap:20px 14px; padding-top:10px; }
+  .note {
+    position:relative; background:#fffdf0; color:#3a3325;
+    border-radius:3px; padding:22px 12px 12px; min-height:92px;
+    font-size:.95rem; line-height:1.45; word-break:break-word;
+    box-shadow:0 8px 12px rgba(50,28,6,.38);
+    transform:rotate(-1.6deg);
+  }
+  .note:nth-child(2n){ transform:rotate(1.5deg); }
+  .note:nth-child(3n){ transform:rotate(-.5deg); }
+  /* push pin */
+  .note::before {
+    content:''; position:absolute; top:-9px; left:50%; margin-left:-8px;
+    width:16px; height:16px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffb3b3, var(--accent) 62%, #7d2325);
+    box-shadow:0 3px 4px rgba(0,0,0,.4), inset 0 -2px 3px rgba(0,0,0,.25);
+    z-index:2;
+  }
+  .note.pin-green::before {
+    background:radial-gradient(circle at 35% 30%, #a8e6b8, var(--ok) 62%, #1c6b3d);
+  }
+  .note .task-text { margin-top:2px; }
+  .note .meta { font-size:.72rem; opacity:.7; margin-top:9px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .badge { background:rgba(0,0,0,.09); padding:1px 8px; border-radius:999px; white-space:nowrap; }
+  .badge.ov { background:var(--tint-err); color:var(--err); font-weight:700; }
+  .note.overdue { background:#ffeaea; }
+  .note.done { background:#f1efe6; opacity:.88; }
+  .note.done .task-text { text-decoration:line-through; opacity:.65; }
+  .note-actions { position:absolute; top:13px; right:7px; display:flex; gap:2px; opacity:.8; }
+  .note-actions button {
+    border:none; background:transparent; cursor:pointer; font-size:.92rem;
+    padding:2px 3px; border-radius:6px; line-height:1;
+  }
+  .note-actions button:hover { background:rgba(0,0,0,.10); }
+  .empty-note { color:#fff3dd; text-shadow:0 1px 2px rgba(0,0,0,.4); font-size:.9rem; margin:6px 4px; }
+
+  /* ---- add-task paper strip ---- */
+  .add-strip {
+    background:#fffdf0; color:#3a3325; border-radius:3px;
+    transform:rotate(-.7deg); box-shadow:0 8px 12px rgba(50,28,6,.38);
+    padding:18px 14px 14px; display:flex; gap:8px; flex-wrap:wrap;
+    max-width:680px; margin:0 auto 28px; position:relative;
+  }
+  .add-strip::before {
+    content:''; position:absolute; top:-9px; left:26px; width:16px; height:16px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #bcd9ff, var(--blue) 62%, #12263f);
+    box-shadow:0 3px 4px rgba(0,0,0,.4), inset 0 -2px 3px rgba(0,0,0,.25);
+  }
+  .add-strip input {
+    border:1px dashed #b7a98a; background:transparent; border-radius:6px;
+    padding:9px 11px; font-family:inherit; font-size:.95rem; color:inherit;
+  }
+  .add-strip input:focus { outline:2px solid var(--blue); outline-offset:1px; }
+  #b-text { flex:1; min-width:190px; }
+  #b-date { min-width:140px; }
+</style>
+</head>
+<body>
+<header class="topbar"><span class="brand-badge jp">日本語</span><span class="brand-title">Cardboard History</span></header>
+<nav id="nav"></nav>
+<main>
+  <div class="page-head">
+    <h2>📌 Cardboard History</h2>
+    <p class="muted">Pin tasks to plan, finish them, and look back on what you did.</p>
+  </div>
+
+  <div class="add-strip">
+    <input type="text" id="b-text" placeholder="What needs doing?" maxlength="200">
+    <input type="date" id="b-date">
+    <button class="btn primary" id="b-add">📌 Add</button>
+  </div>
+
+  <div class="board">
+    <div class="cols">
+      <section>
+        <h3>🕗 <span>Upcoming</span> <span class="cnt">(<span id="up-count">0</span>)</span></h3>
+        <div class="notes" id="up-notes"></div>
+      </section>
+      <section>
+        <h3>✅ <span>Finished</span> <span class="cnt">(<span id="fin-count">0</span>)</span></h3>
+        <div class="notes" id="fin-notes"></div>
+      </section>
+    </div>
+  </div>
+</main>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+(function () {
+  var KEY = 'board_tasks';
+  var TASKS = JL.pref(KEY) || [];
+  if (JL.pref(KEY) === null) JL.pref(KEY, []);
+
+  function save() { JL.pref(KEY, TASKS); }
+
+  function fmtD(v) {
+    try { return new Date(v + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+    catch (e) { return v; }
+  }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function render() {
+    var td = todayStr();
+    var pend = TASKS.filter(function (t) { return !t.done; })
+      .sort(function (a, b) { return (a.due || '9999-99-99') < (b.due || '9999-99-99') ? -1 : 1; });
+    var fin = TASKS.filter(function (t) { return t.done; })
+      .sort(function (a, b) { return (b.doneAt || 0) - (a.doneAt || 0); });
+    document.getElementById('up-count').textContent = pend.length;
+    document.getElementById('fin-count').textContent = fin.length;
+
+    document.getElementById('up-notes').innerHTML = pend.map(function (t) {
+      var cls = 'note' + (t.due && t.due < td ? ' overdue' : '');
+      var badge = !t.due ? '<span class="badge">Someday</span>'
+        : (t.due === td ? '<span class="badge">Today</span>'
+        : (t.due < td ? '<span class="badge ov">Overdue</span>' : ''));
+      return '<div class="' + cls + '" data-id="' + t.id + '"><div class="task-text">' + JL.esc(t.text) + '</div>' +
+        '<div class="meta">' + (t.due ? '<span>📅 ' + JL.esc(fmtD(t.due)) + '</span>' : '') + badge + '</div>' +
+        '<div class="note-actions"><button class="act-done" title="Mark done">✓</button><button class="act-del" title="Delete">🗑️</button></div></div>';
+    }).join('') || '<p class="empty-note">No tasks yet — pin your first one!</p>';
+
+    document.getElementById('fin-notes').innerHTML = fin.map(function (t) {
+      return '<div class="note done pin-green" data-id="' + t.id + '"><div class="task-text">' + JL.esc(t.text) + '</div>' +
+        '<div class="meta"><span>✅ ' + (t.doneAt ? JL.esc(fmtD(new Date(t.doneAt).toISOString().slice(0, 10))) : '') + '</span></div>' +
+        '<div class="note-actions"><button class="act-undo" title="Move back to upcoming">↩</button><button class="act-del" title="Delete">🗑️</button></div></div>';
+    }).join('') || '<p class="empty-note">Nothing finished yet.</p>';
+
+    wire(document.getElementById('up-notes'));
+    wire(document.getElementById('fin-notes'));
+  }
+
+  function wire(box) {
+    Array.prototype.forEach.call(box.querySelectorAll('.note'), function (n) {
+      var id = n.dataset.id, b;
+      if ((b = n.querySelector('.act-done'))) b.onclick = function () {
+        TASKS.forEach(function (t) { if (String(t.id) === id) { t.done = true; t.doneAt = Date.now(); } });
+        save(); render(); JL.toast('Moved to Finished ✅', 'ok');
+      };
+      if ((b = n.querySelector('.act-undo'))) b.onclick = function () {
+        TASKS.forEach(function (t) { if (String(t.id) === id) { t.done = false; t.doneAt = null; } });
+        save(); render();
+      };
+      if ((b = n.querySelector('.act-del'))) b.onclick = function () {
+        TASKS = TASKS.filter(function (t) { return String(t.id) !== id; });
+        save(); render(); JL.toast('Task deleted.', 'warn');
+      };
+    });
+  }
+
+  document.getElementById('b-add').onclick = function () {
+    var inp = document.getElementById('b-text'), dt = document.getElementById('b-date');
+    var text = inp.value.trim();
+    if (!text) { JL.toast('Type a task first.', 'err'); return; }
+    TASKS.push({
+      id: String(Date.now()) + String(Math.floor(Math.random() * 900) + 100),
+      text: text, due: dt.value || '', done: false, doneAt: null
+    });
+    inp.value = ''; dt.value = '';
+    save(); render();
+    JL.toast('Pinned to the board ✅', 'ok');
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
