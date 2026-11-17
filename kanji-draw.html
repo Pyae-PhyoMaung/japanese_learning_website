@@ -65,7 +65,7 @@
 
   var chapters = [];
   ALL.forEach(function (k) {
-    if (!chapters.some(function (c) { return c.n === k.chapter; })) chapters.push({ n: k.chapter, t: k.chapterTitle });
+    if (!chapters.some(function (c) { return c.n === k.chapter; })) chapters.push({ n: k.chapter, t: JL.chapterTitle('kanji', k.chapter, k.chapterTitle) });
   });
   chapters.sort(function (a, b) { return a.n - b.n; });
   var chapterFilter = 0;
@@ -103,7 +103,7 @@
     });
     document.getElementById('say-cur').onclick = function () { JL.speak(k.kanji); };
     document.getElementById('progress').textContent = 'Kanji ' + (idx + 1) + ' of ' + L.length +
-      (chapterFilter ? ' (' + chapterFilter + '章 ' + JL.esc(L[idx].chapterTitle) + ')' : '');
+      (chapterFilter ? ' (' + chapterFilter + '章 ' + JL.esc(JL.chapterTitle('kanji', chapterFilter, L[idx].chapterTitle)) + ')' : '');
     pad.setGuide(k.kanji, showGuide);
     pad.clear();
   }

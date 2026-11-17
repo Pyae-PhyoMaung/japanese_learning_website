@@ -160,6 +160,17 @@ window.JL = (function () {
             method: 'POST',
             headers: cloudHeaders(c, { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' }),
             body: JSON.stringify({ user_id: c.user || 'main', data: merged })
+          }).then(function () {
+            /* remember that the cloud now matches this browser — otherwise the
+               next live-sync poll would believe "server is newer" and reload
+               the page the user is working on every ~30s */
+            try {
+              var cur = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+              if (!cur._sync || (cur._sync.at || 0) <= merged._sync.at) {
+                cur._sync = merged._sync;
+                localStorage.setItem(STORE_KEY, JSON.stringify(cur));
+              }
+            } catch (e3) {}
           }).catch(function () {});
         }).catch(function () { /* server unreadable — fall back to posting local only */
           try {
@@ -173,20 +184,20 @@ window.JL = (function () {
       } catch (e) {}
     });
   }
-  var syncTimer = null;
+  var syncTimer = null, pendingRefresh = false;
   function schedulePush() {
     if (location.protocol === 'file:') return;
     clearTimeout(syncTimer);
     syncTimer = setTimeout(pushUserData, 1500);
   }
-  function pullUserData() {
+  function pullUserData(done) {
     if (location.protocol === 'file:' || typeof fetch === 'undefined') return;
     cloudCfg().then(function (c) {
-      if (!c) return;
+      if (!c) { if (done) done({ updated: false }); return; }
       var q = c.url + '/rest/v1/user_data?select=data&user_id=eq.' + encodeURIComponent(c.user || 'main');
       fetch(q, { headers: cloudHeaders(c) }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rows) {
         var srv = rows && rows[0] && rows[0].data;
-        if (!srv || !srv._sync) return;
+        if (!srv || !srv._sync) { if (done) done({ updated: false }); return; }
         var local = getUser();
         var lat = (local && local._sync && local._sync.at) || 0;
         if ((srv._sync.at || 0) > lat && !userBusy()) {
@@ -204,9 +215,18 @@ window.JL = (function () {
           /* if local had items the server lacks, push the merged copy up so
              they survive everywhere; harmless no-op when nothing was unique */
           if (merged !== srv && JSON.stringify(merged) !== JSON.stringify(srv)) schedulePush();
-          refreshPage();
-        }
-      }).catch(function () {});
+          /* only reload when the current page can safely take it — an open
+             Add/Edit form, a drawing pad or a busy quiz is never yanked away */
+          if (refreshBlocked()) {
+            pendingRefresh = true;
+            if (done) done({ updated: true, pending: true });
+          } else {
+            pendingRefresh = false;
+            refreshPage();
+            if (done) done({ updated: true });
+          }
+        } else if (done) done({ updated: false });
+      }).catch(function () { if (done) done({ updated: false }); });
     });
   }
   function userBusy() {
@@ -215,14 +235,25 @@ window.JL = (function () {
     if (document.querySelector('.quiz-opts, .flashcard, .modal:not(.hidden)')) return true;
     return false;
   }
+  /* pages that hold in-progress state in the DOM (unsaved form position,
+     drawing pad) must never be auto-reloaded out from under the user */
+  function refreshBlocked() {
+    var pg = location.pathname.split('/').pop() || 'index.html';
+    if (pg === 'edit.html' || pg === 'kanji-draw.html' || pg === 'vocab-draw.html') return true;
+    return userBusy();
+  }
   function refreshPage() {
     if (location.protocol === 'file:') return;
-    var p = (location.pathname.split('/').pop() || 'index.html') + location.search;
-    setTimeout(function () { navigate(p, false); }, 60);
+    var p = (location.pathname.split('/').pop() || 'index.html') + location.search + location.hash;
+    var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+    setTimeout(function () { navigate(p, false, { restoreScroll: y }); }, 60);
   }
   function startLiveSync() {
     if (location.protocol === 'file:') return;
-    setInterval(function () { pullUserData(); }, 30000);
+    setInterval(function () {
+      if (pendingRefresh && !refreshBlocked()) { pendingRefresh = false; refreshPage(); return; }
+      pullUserData();
+    }, 30000);
   }
   function pref(key, val) {
     var u = getUser();
@@ -571,13 +602,34 @@ window.JL = (function () {
     { href: 'partner.html', icon: '🤝', label: 'Study Partner' },
     { href: 'edit.html', icon: '⚙️', label: 'Add / Edit' }
   ];
+  /* first NAV_PRIMARY links stay visible on phones; the rest live under More */
+  var NAV_PRIMARY = 5;
   function renderNav() {
     var el = document.getElementById('nav');
     if (!el) return;
     var page = (location.pathname.split('/').pop() || 'index.html');
-    el.innerHTML = NAV.map(function (n) {
-      return '<a class="' + (n.href === page ? 'active' : '') + '" href="' + n.href + '"><span class="ic">' + n.icon + '</span>' + n.label + '</a>';
-    }).join('');
+    var hiddenActive = false;
+    el.innerHTML = NAV.map(function (n, i) {
+      var act = n.href === page;
+      if (act && i >= NAV_PRIMARY) hiddenActive = true;
+      return '<a class="' + (act ? 'active' : '') + (i >= NAV_PRIMARY ? ' nav-extra' : '') + '" href="' + n.href + '"><span class="ic">' + n.icon + '</span>' + n.label + '</a>';
+    }).join('') +
+      '<button class="nav-more-btn' + (hiddenActive ? ' has-active' : '') + '" id="nav-more" type="button">☰ More</button>' +
+      '<button class="nav-sync-btn" id="nav-refresh" type="button" title="Check for new data">↻</button>';
+    var more = document.getElementById('nav-more');
+    if (more) more.onclick = function () {
+      var open = el.classList.toggle('nav-open');
+      more.textContent = open ? '✕ Close' : '☰ More';
+    };
+    var rf = document.getElementById('nav-refresh');
+    if (rf) rf.onclick = function () {
+      rf.classList.add('spin');
+      pullUserData(function (r) {
+        rf.classList.remove('spin');
+        if (r && r.updated && r.pending) JL.toast('New data is ready — it will load when you leave this page.', 'ok');
+        else JL.toast(r && r.updated ? 'Data updated ✓' : 'Already up to date', 'ok');
+      });
+    };
   }
 
   /* ---------- generic quiz runner ---------- */
@@ -897,7 +949,7 @@ window.JL = (function () {
     document.body.appendChild(s);
     runScripts(scripts, i + 1);
   }
-  function navigate(href, push) {
+  function navigate(href, push, opts) {
     if (router.busy) return;
     router.busy = true;
     var pathOnly = href.split('?')[0];
@@ -916,8 +968,8 @@ window.JL = (function () {
         Array.prototype.forEach.call(doc.querySelectorAll('script:not([src])'), function (s) {
           scripts.push(s.textContent);
         });
-        window.scrollTo(0, 0);
         runScripts(scripts, 0);
+        window.scrollTo(0, (opts && opts.restoreScroll != null) ? opts.restoreScroll : 0);
         router.busy = false;
       });
     }).catch(function () {
@@ -1017,6 +1069,17 @@ window.JL = (function () {
     pref('kimg', m);
   }
 
+  /* display title of chapter n — a renamed chapter (uchapters registry)
+     always wins over the title baked into the data items */
+  function chapterTitle(kind, n, fb) {
+    var num = Number(n) || 0;
+    if (num > 0) {
+      var c = (pref('uchapters') || []).filter(function (x) { return Number(x.n) === num; })[0];
+      if (c && c.t) return c.t;
+    }
+    return fb || '';
+  }
+
   /* ---------- public API ---------- */
   return {
     data: merged, save: save, remove: remove, restore: restore,
@@ -1025,7 +1088,7 @@ window.JL = (function () {
     quiz: quiz, flashcards: flashcards, pad: pad,
     files: { list: filesList, put: filePut, get: fileGet, del: fileDel, cat: fileCat },
     sync: { push: pushUserData, pull: pullUserData, live: startLiveSync },
-    pref: pref, chapters: chapters, kimg: { get: kimgGet, set: kimgSet }, mmfix: mmfixValue,
+    pref: pref, chapters: chapters, chapterTitle: chapterTitle, kimg: { get: kimgGet, set: kimgSet }, mmfix: mmfixValue,
     level: level, setLevel: setLevel, byLevel: byLevel, levelBar: mountLevelBar, LEVELS: LEVELS
   };
 })();

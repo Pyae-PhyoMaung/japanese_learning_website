@@ -76,7 +76,7 @@
   var ALL = JL.byLevel(JL.data('kanji'));
   var chapters = [];
   ALL.forEach(function (k) {
-    if (!chapters.some(function (c) { return c.n === k.chapter; })) chapters.push({ n: k.chapter, t: k.chapterTitle });
+    if (!chapters.some(function (c) { return c.n === k.chapter; })) chapters.push({ n: k.chapter, t: JL.chapterTitle('kanji', k.chapter, k.chapterTitle) });
   });
   chapters.sort(function (a, b) { return a.n - b.n; });
 
@@ -158,10 +158,8 @@
     var list = filtered();
     document.getElementById('k-count').textContent = list.length + ' kanji';
     var sel = JL.pref('sel_kanji') || [];
-    var imgs = JL.pref('kimg') || {};
     document.getElementById('k-grid').innerHTML = list.map(function (k) {
       return '<div class="kanji-card" data-id="' + k.id + '">' +
-        (imgs[k.id] ? '<span class="kimg-badge" title="Has image">📷</span>' : '') +
         '<input type="checkbox" class="sel-check" data-sel="' + k.id + '"' + (sel.indexOf(k.id) >= 0 ? ' checked' : '') + ' title="Select for Learn">' +
         '<span class="kchar jp">' + JL.esc(k.kanji) + '</span>' +
         '<span class="krd jp">' + JL.esc(kReading(k)) + '</span>' +

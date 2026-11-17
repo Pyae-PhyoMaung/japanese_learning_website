@@ -214,7 +214,7 @@
       '<h2 class="jp" style="font-size:2.1rem;text-align:center;word-break:break-word">' + JL.esc(v.jp) + '</h2>' +
       '<p style="text-align:center" class="jp"><b>' + JL.esc(v.rd || '') + '</b>' + (v.romaji ? ' <span class="muted">' + JL.esc(v.romaji) + '</span>' : '') + '</p>' +
       '<p style="text-align:center"><span class="jp">' + JL.esc(v.mm || '') + '</span>' + (v.en ? ' · <b>' + JL.esc(v.en) + '</b>' : '') + '</p>' +
-      '<p style="text-align:center" class="muted small">' + (v.chapter ? v.chapter + '章 ' + JL.esc(v.chapterTitle || '') : JL.esc(v.cat || '')) + '</p>' +
+      '<p style="text-align:center" class="muted small">' + (v.chapter ? v.chapter + '章 ' + JL.esc(JL.chapterTitle('vocab', v.chapter, v.chapterTitle)) : JL.esc(v.cat || '')) + '</p>' +
       '<div style="text-align:center;margin:6px 0 10px">' +
       '<button class="btn" data-say="' + JL.esc(v.jp) + '">🔊 Listen to the word</button> ' +
       '<a class="btn primary" href="write.html?tab=vocab&v=' + encodeURIComponent(v.jp) + '">✍️ Practice writing</a></div>';

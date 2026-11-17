@@ -74,7 +74,7 @@
       '<div><b>English:</b> ' + JL.esc(v.en || '—') + '</div></div>' +
       (synHtml || antHtml ? '<div style="margin:6px 0">' + synHtml + antHtml + '</div>' : '') +
       exHtml +
-      '<p class="muted small" style="margin:8px 0 0">' + (v.chapter ? v.chapter + '章 ' + JL.esc(v.chapterTitle || '') : JL.esc(v.cat || '')) + '</p></div>';
+      '<p class="muted small" style="margin:8px 0 0">' + (v.chapter ? v.chapter + '章 ' + JL.esc(JL.chapterTitle('vocab', v.chapter, v.chapterTitle)) : JL.esc(v.cat || '')) + '</p></div>';
   }
 
   function kanjiCards(q) {

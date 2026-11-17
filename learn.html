@@ -97,11 +97,11 @@
     if (kind === 'kanji') {
       return '<div class="learn-reveal jp">' + JL.esc((it.on || []).join(' · ')) + ' / <b>' + JL.esc(it.kun || '—') + '</b></div>' +
         '<div class="learn-reveal"><b>' + JL.esc(it.en || '') + '</b>' + (it.meaning ? ' · <span class="jp">' + JL.esc(it.meaning) + '</span>' : '') + '</div>' +
-        '<div class="muted small">' + (it.chapter || 0) + '章 ' + JL.esc(it.chapterTitle || '') + '</div>';
+        '<div class="muted small">' + (it.chapter || 0) + '章 ' + JL.esc(JL.chapterTitle('kanji', it.chapter, it.chapterTitle)) + '</div>';
     }
     return '<div class="learn-reveal jp"><b>' + JL.esc(it.rd || '') + '</b></div>' +
       '<div class="learn-reveal"><span class="jp">' + JL.esc(it.mm || '') + '</span>' + (it.en ? ' · ' + JL.esc(it.en) : '') + '</div>' +
-      '<div class="muted small">' + (it.chapter ? it.chapter + '章 ' + JL.esc(it.chapterTitle || '') : JL.esc(it.cat || '')) + '</div>';
+      '<div class="muted small">' + (it.chapter ? it.chapter + '章 ' + JL.esc(JL.chapterTitle('vocab', it.chapter, it.chapterTitle)) : JL.esc(it.cat || '')) + '</div>';
   }
 
   function render() {

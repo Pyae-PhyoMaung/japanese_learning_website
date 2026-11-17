@@ -348,3 +348,19 @@ details.cat-card[open] summary{margin-bottom:8px}
 .autosaved::after{content:"";display:inline-block;animation:fadeout 1.4s forwards}
 @keyframes fadeout{to{opacity:0}}
 
+/* ===== Round 14: compact nav (More menu on phones) + manual sync button ===== */
+nav#nav .nav-more-btn{display:none}
+nav#nav .nav-sync-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;border:1px solid var(--border);background:#fff;border-radius:999px;font-size:1rem;cursor:pointer;color:var(--ink);margin-left:auto}
+nav#nav .nav-sync-btn:hover{background:var(--accent-soft)}
+nav#nav .nav-sync-btn.spin{animation:nav-spin .8s linear infinite}
+@keyframes nav-spin{to{transform:rotate(360deg)}}
+@media (max-width:760px){
+  nav#nav .nav-extra{display:none}
+  nav#nav.nav-open .nav-extra{display:inline-flex}
+  nav#nav .nav-more-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:#fff;border-radius:999px;padding:6px 12px;font-size:.9rem;cursor:pointer;color:var(--ink);white-space:nowrap}
+  nav#nav .nav-more-btn:hover{background:var(--accent-soft)}
+  nav#nav .nav-more-btn.has-active{border-color:var(--accent);color:var(--accent);font-weight:700}
+  nav#nav .nav-sync-btn{margin-left:0}
+  nav#nav.nav-open .nav-sync-btn{margin-left:auto}
+}
+
