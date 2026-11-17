@@ -982,6 +982,10 @@ window.JL = (function () {
   function navigate(href, push, opts) {
     if (router.busy) return;
     router.busy = true; router.busyAt = Date.now();
+    /* stage markers: if the main thread ever freezes mid-navigation, the
+       last written stage (localStorage 'jl_navstage') pinpoints where */
+    function navMark(stage) { try { localStorage.setItem('jl_navstage', href + ' @ ' + stage + ' ' + new Date().toISOString()); } catch (e) {} }
+    navMark('start');
     var pathOnly = href.split('?')[0];
     fetch(pathOnly).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -991,18 +995,22 @@ window.JL = (function () {
       var main = doc.querySelector('main');
       if (!main) { router.busy = false; location.href = href; return; }
       ensureHeadResources(doc.head, function () {
+        navMark('head-done');
         if (push !== false) { try { history.pushState(null, '', href); } catch (e) {} }
         document.title = doc.title || 'Japanese Learning';
         document.querySelector('main').replaceWith(main);
+        navMark('swapped');
         var scripts = [];
         Array.prototype.forEach.call(doc.querySelectorAll('script:not([src])'), function (s) {
           scripts.push(s.textContent);
         });
         runScripts(scripts, 0);
+        navMark('scripts-done');
         window.scrollTo(0, (opts && opts.restoreScroll != null) ? opts.restoreScroll : 0);
         router.busy = false;
       });
     }).catch(function () {
+      navMark('fallback-reload');
       router.busy = false;
       location.href = href;
     });
@@ -1031,7 +1039,10 @@ window.JL = (function () {
     /* safety: if a navigation ever hangs (e.g. a CDN script stalls), unstick
        the router so header links keep working */
     setInterval(function () {
-      if (router.busy && Date.now() - (router.busyAt || 0) > 8000) { router.busy = false; router.busyAt = 0; }
+      if (router.busy && Date.now() - (router.busyAt || 0) > 8000) {
+        try { localStorage.setItem('jl_hang', 'busy stuck >8s | last stage: ' + localStorage.getItem('jl_navstage')); } catch (e) {}
+        router.busy = false; router.busyAt = 0;
+      }
     }, 3000);
   }
 
@@ -1137,9 +1148,9 @@ window.JL = (function () {
      of every text node (static and dynamically inserted), and via tt(). */
   var MM = {
     'Home': 'ပင်မ', 'Library': 'စာကြည့်တိုက်', 'Learn': 'လေ့လာ', 'Kanji': 'ခန်းဂျိ',
-    'Vocabulary': 'စကားလုံးများ', 'Dictionary': 'အဘိဓာန်', 'Writing': 'စာရေးမည်', 'Kana': 'Kana',
-    'Grammar': 'သဒ္ဒါ', 'Listening': 'နားထောင်မည်', 'Tests': 'Tests', 'Practice': 'လေ့ကျင့်ခန်း', 'Tools': 'ကိရိယာများ', 'Files': 'ဖိုင်များ',
-    'Study Partner': 'Study Partner', 'Add / Edit': 'ထည့်ရန် / ပြင်ရန်', 'More': 'နောက်ထပ်', 'Close': 'ပိတ်မည်',
+    'Vocabulary': 'စကားလုံးများ', 'Dictionary': 'အဘိဓာန်', 'Writing': 'စာရေးမည်', 'Kana': 'ကာန',
+    'Grammar': 'သဒ္ဒါ', 'Listening': 'နားထောင်မည်', 'Tests': 'စာမေးပွဲများ', 'Practice': 'လေ့ကျင့်ခန်း', 'Tools': 'ကိရိယာများ', 'Files': 'ဖိုင်များ',
+    'Study Partner': 'လေ့လာရေးအဖော်', 'Add / Edit': 'ထည့်ရန် / ပြင်ရန်', 'More': 'နောက်ထပ်', 'Close': 'ပိတ်မည်',
     'All': 'အားလုံး', 'All chapters': 'အခန်းအားလုံး', 'All kanji': 'ခန်းဂျိ အားလုံး',
     'All words': 'စကားလုံး အားလုံး', 'All sentences': 'ဝါကျအားလုံး', 'All grammar': 'သဒ္ဒါအားလုံး',
     'All levels': 'အဆင့်အားလုံး', 'Chapters': 'အခန်းများ', 'Level': 'အဆင့်', 'Title': 'ခေါင်းစဉ်',
@@ -1156,7 +1167,7 @@ window.JL = (function () {
     '↩ Undo stroke': '↩ စုတ်တံပြန်ဖျက်ရန်', '👁 Hide guide': '👁 လမ်းညွှန်ဝှက်ရန်', '— no chapter —': '— အခန်းမရှိပါ —',
     '✨ New / clear': '✨ အသစ် / ရှင်းရန်', '📚 Chapters': '📚 အခန်းများ', '🗑 Delete': '🗑 ဖျက်ရန်',
     'My Files': 'ကျွန်ုပ်၏ ဖိုင်များ', '🗂️ My Files': '🗂️ ကျွန်ုပ်၏ ဖိုင်များ', '✍️ Write': '✍️ ရေးရန်',
-    'Flashcards': 'Flashcards', 'Start flashcards': 'flashcards စတင်ရန်', 'Start quiz': 'ဉာဏ်စမ်း စတင်ရန်',
+    'Flashcards': 'ဖလက်ရှ်ကဒ်', 'Start flashcards': 'ဖလက်ရှ်ကဒ် စတင်ရန်', 'Start quiz': 'ဉာဏ်စမ်း စတင်ရန်',
     'Start quiz (10 questions)': 'ဉာဏ်စမ်း စတင်ရန် (မေးခွန်း ၁၀ ခု)', 'Next word →': 'နောက်စကားလုံး →',
     '← Prev word': '← ရှေ့စကားလုံး', 'My tests': 'ကျွန်ုပ်၏ test များ', 'Your tests': 'သင်၏ test များ',
     'No matches.': 'မတွေ့ရှိပါ။', 'No tests yet.': 'tests မရှိသေးပါ။',
@@ -1222,7 +1233,11 @@ window.JL = (function () {
       if (!n) return;
       if (n.nodeType === 3) {
         var s = n.nodeValue, key = s.replace(/^\s+|\s+$/g, '');
-        if (key && map[key]) n.nodeValue = s.replace(key, map[key]);
+        /* only set when the value actually changes — setting an unchanged
+           value still fires the characterData observer, which re-enters
+           translateNode and can loop forever (froze the page whenever a
+           translation equaled its key, e.g. 'Tests': 'Tests') */
+        if (key && map[key]) { var t = s.replace(key, map[key]); if (t !== s) n.nodeValue = t; }
       } else if (n.nodeType === 1 && !/^(script|style)$/i.test(n.tagName)) {
         /* in English mode never touch Japanese / Myanmar data content */
         if (!mm && typeof n.className === 'string' && /(^|\s)(jp|mm)(\s|$)/.test(n.className)) return;
