@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kanji | Japanese Learning</title>
 <script>try{if(localStorage.getItem('jl_theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
@@ -21,6 +22,12 @@
     <button class="tab active" data-tab="learn">Learn</button>
     <button class="tab" data-tab="cards">Flashcards</button>
     <button class="tab" data-tab="quiz">Quiz</button>
+    <button class="tab" data-tab="blank">Fill in the blank</button>
+  </div>
+
+  <div class="toolbar" id="scope-bar" style="display:none">
+    <label class="muted small">Practice scope:</label>
+    <select id="p-scope"></select>
   </div>
 
   <div id="panel-learn" class="tab-panel active">
@@ -42,13 +49,11 @@
   </div>
 
   <div id="panel-cards" class="tab-panel">
-    <div class="chips" id="chapter-chips2"></div>
     <button class="btn primary" id="cards-start">Start flashcards</button>
     <div id="cards-area" style="margin-top:16px"></div>
   </div>
 
   <div id="panel-quiz" class="tab-panel">
-    <div class="chips" id="chapter-chips3"></div>
     <div class="toolbar">
       <select id="quiz-mode">
         <option value="reading">Kanji → reading (choose the correct reading)</option>
@@ -58,6 +63,13 @@
       <button class="btn primary" id="quiz-start">Start quiz (10 questions)</button>
     </div>
     <div id="quiz-area" style="margin-top:16px"></div>
+  </div>
+
+  <div id="panel-blank" class="tab-panel">
+    <div class="toolbar">
+      <button class="btn primary" id="blank-start">Start fill in the blank (10 questions)</button>
+    </div>
+    <div id="blank-area" style="margin-top:16px"></div>
   </div>
 
   <!-- detail modal -->
@@ -152,6 +164,22 @@
       }
       return true;
     });
+  }
+
+  /* practice scope — All chapters or one chapter, shared by Flashcards /
+     Quiz / Fill in the blank (replaces the old per-panel chapter chips) */
+  function buildScope() {
+    var el = document.getElementById('p-scope');
+    el.innerHTML = '<option value="all">All chapters (' + ALL.length + ' kanji)</option>' +
+      chapters.map(function (c) {
+        var cnt = ALL.filter(function (k) { return k.chapter === c.n; }).length;
+        return '<option value="' + c.n + '">' + (c.n || '?') + '章 ' + JL.esc(c.t) + ' (' + cnt + ')</option>';
+      }).join('');
+  }
+  function practicePool() {
+    var v = document.getElementById('p-scope').value;
+    if (v === 'all') return ALL;
+    return ALL.filter(function (k) { return String(k.chapter || 0) === v; });
   }
 
   function kReading(k) { return (k.kun || (k.on || [])[0] || ''); }
@@ -336,13 +364,14 @@
       document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
       t.classList.add('active');
       document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+      document.getElementById('scope-bar').style.display = t.dataset.tab === 'learn' ? 'none' : '';
     };
   });
 
   /* flashcards */
   document.getElementById('cards-start').onclick = function () {
-    var list = filtered();
-    if (!list.length) { JL.toast('No kanji match the current filter.'); return; }
+    var list = practicePool();
+    if (!list.length) { JL.toast('No kanji in this scope.'); return; }
     JL.flashcards(document.getElementById('cards-area'), list.map(function (k) {
       return {
         front: JL.esc(k.kanji),
@@ -356,8 +385,8 @@
   /* quiz */
   function buildQuiz() {
     var mode = document.getElementById('quiz-mode').value;
-    var pool = filtered();
-    if (pool.length < 4) { JL.toast('Need at least 4 kanji in the current filter.'); return null; }
+    var pool = practicePool();
+    if (pool.length < 4) { JL.toast('Need at least 4 kanji in this scope.'); return null; }
     var qs = JL.pickN(pool, Math.min(10, pool.length)).map(function (k) {
       var others = JL.pickN(pool.filter(function (o) { return o.id !== k.id; }), 3);
       if (mode === 'reading') {
@@ -380,7 +409,30 @@
     if (qs) JL.quiz(document.getElementById('quiz-area'), qs, { title: 'Kanji quiz' });
   };
 
-  renderChips('chapter-chips2'); renderChips('chapter-chips3');
+  /* fill in the blank — an example word with the kanji hidden */
+  function buildBlank() {
+    var pool = practicePool(), qs = [];
+    JL.shuffle(pool).forEach(function (k) {
+      if (qs.length >= 10) return;
+      var ex = (k.examples || []).filter(function (e) { return e.word && e.word.indexOf(k.kanji) >= 0; })[0];
+      if (!ex) return;
+      var others = JL.pickN(ALL.filter(function (o) { return o.id !== k.id; }), 3);
+      var opts = JL.shuffle([k.kanji].concat(others.map(function (o) { return o.kanji; })));
+      qs.push({
+        q: JL.esc(ex.word.replace(k.kanji, '◯')) + '  (' + JL.esc(ex.reading || '') + ')',
+        opts: opts, ans: opts.indexOf(k.kanji), say: ex.word,
+        note: '<b><span class="jp">' + JL.esc(ex.word) + '</span></b> — <span class="jp">' + JL.esc(ex.meaning || '') + '</span>' + (k.en ? ' (' + JL.esc(k.en) + ')' : '')
+      });
+    });
+    return qs;
+  }
+  document.getElementById('blank-start').onclick = function () {
+    var qs = buildBlank();
+    if (!qs.length) { JL.toast('No kanji in this scope have example words to blank out.'); return; }
+    JL.quiz(document.getElementById('blank-area'), qs, { title: 'Fill in the blank' });
+  };
+
+  buildScope();
   renderChapters();
   renderGrid();
 })();

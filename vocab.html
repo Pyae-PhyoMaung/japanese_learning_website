@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vocabulary | Japanese Learning</title>
 <script>try{if(localStorage.getItem('jl_theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
@@ -22,6 +23,12 @@
     <button class="tab active" data-tab="learn">Learn</button>
     <button class="tab" data-tab="cards">Flashcards</button>
     <button class="tab" data-tab="quiz">Quiz</button>
+    <button class="tab" data-tab="blank">Fill in the blank</button>
+  </div>
+
+  <div class="toolbar" id="scope-bar" style="display:none">
+    <label class="muted small">Practice scope:</label>
+    <select id="p-scope"></select>
   </div>
 
   <div id="panel-learn" class="tab-panel active">
@@ -43,7 +50,6 @@
   </div>
 
   <div id="panel-cards" class="tab-panel">
-    <div class="chips" id="cat-chips2"></div>
     <div class="toolbar">
       <select id="cards-front">
         <option value="jp">Front: Japanese → back: meaning</option>
@@ -55,7 +61,6 @@
   </div>
 
   <div id="panel-quiz" class="tab-panel">
-    <div class="chips" id="cat-chips3"></div>
     <div class="toolbar">
       <select id="quiz-mode">
         <option value="jp2m">Japanese → meaning</option>
@@ -65,6 +70,13 @@
       <button class="btn primary" id="quiz-start">Start quiz (10 questions)</button>
     </div>
     <div id="quiz-area" style="margin-top:16px"></div>
+  </div>
+
+  <div id="panel-blank" class="tab-panel">
+    <div class="toolbar">
+      <button class="btn primary" id="blank-start">Start fill in the blank (10 questions)</button>
+    </div>
+    <div id="blank-area" style="margin-top:16px"></div>
   </div>
 
   <!-- detail modal -->
@@ -110,7 +122,6 @@
           state.cat === '' ? 'All words' :
           state.cat === '__essential__' ? 'Essential & my words' :
           (ch ? ch.n + '章 ' + ch.t : '');
-        renderChips('cat-chips2'); renderChips('cat-chips3');
         renderGrid();
       };
     });
@@ -167,6 +178,25 @@
   }
 
   function speakTarget(v) { return v.jp; }
+
+  /* practice scope — All words, Essential & my words, or one chapter,
+     shared by Flashcards / Quiz / Fill in the blank (replaces the old chips) */
+  function buildScope() {
+    var el = document.getElementById('p-scope');
+    var chs = JL.chapters('vocab');
+    var nEss = ALL.filter(function (v) { return !v.chapter; }).length;
+    el.innerHTML = '<option value="all">All words (' + ALL.length + ')</option>' +
+      '<option value="__essential__">Essential &amp; my words (' + nEss + ')</option>' +
+      chs.filter(function (c) { return c.n > 0; }).map(function (c) {
+        return '<option value="' + c.n + '">' + c.n + '章 ' + JL.esc(c.t) + ' (' + c.count + ')</option>';
+      }).join('');
+  }
+  function practicePool() {
+    var v = document.getElementById('p-scope').value;
+    if (v === 'all') return ALL;
+    if (v === '__essential__') return ALL.filter(function (w) { return !w.chapter; });
+    return ALL.filter(function (w) { return String(w.chapter || 0) === v; });
+  }
 
   function renderGrid() {
     var list = filtered();
@@ -247,13 +277,14 @@
       document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
       t.classList.add('active');
       document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+      document.getElementById('scope-bar').style.display = t.dataset.tab === 'learn' ? 'none' : '';
     };
   });
 
   /* flashcards */
   document.getElementById('cards-start').onclick = function () {
-    var list = filtered();
-    if (!list.length) { JL.toast('No words match the current filter.'); return; }
+    var list = practicePool();
+    if (!list.length) { JL.toast('No words in this scope.'); return; }
     var frontMode = document.getElementById('cards-front').value;
     JL.flashcards(document.getElementById('cards-area'), list.map(function (v) {
       var jp = '<span class="jp" style="font-size:1.6rem">' + JL.esc(v.jp) + '</span>' +
@@ -266,8 +297,8 @@
   /* quiz */
   document.getElementById('quiz-start').onclick = function () {
     var mode = document.getElementById('quiz-mode').value;
-    var pool = filtered();
-    if (pool.length < 4) { JL.toast('Need at least 4 words in the current filter.'); return; }
+    var pool = practicePool();
+    if (pool.length < 4) { JL.toast('Need at least 4 words in this scope.'); return; }
     var qs = JL.pickN(pool, Math.min(10, pool.length)).map(function (v) {
       var others = JL.pickN(pool.filter(function (o) { return o.id !== v.id; }), 3);
       if (mode === 'jp2m') {
@@ -285,7 +316,31 @@
     JL.quiz(document.getElementById('quiz-area'), qs, { title: 'Vocabulary quiz' });
   };
 
-  renderChips('cat-chips2'); renderChips('cat-chips3');
+  /* fill in the blank — one character of the word is hidden */
+  function buildBlank() {
+    var pool = practicePool(), qs = [];
+    JL.shuffle(pool).forEach(function (v) {
+      if (qs.length >= 10) return;
+      if (!v.jp) return;
+      var i = Math.floor(Math.random() * v.jp.length);
+      var blanked = v.jp.slice(0, i) + '◯' + v.jp.slice(i + 1);
+      var others = JL.pickN(ALL.filter(function (o) { return o.id !== v.id; }), 3);
+      var opts = JL.shuffle([v.jp].concat(others.map(function (o) { return o.jp; })));
+      qs.push({
+        q: JL.esc(blanked) + '  (' + JL.esc(v.rd || '') + ')',
+        opts: opts, ans: opts.indexOf(v.jp), say: v.jp,
+        note: '<b><span class="jp">' + JL.esc(v.jp) + '</span></b> (' + JL.esc(v.rd || '') + ') — <span class="jp">' + JL.esc(v.mm || '') + '</span>' + (v.en ? ' (' + JL.esc(v.en) + ')' : '')
+      });
+    });
+    return qs;
+  }
+  document.getElementById('blank-start').onclick = function () {
+    var qs = buildBlank();
+    if (!qs.length) { JL.toast('No words in this scope to practice.'); return; }
+    JL.quiz(document.getElementById('blank-area'), qs, { title: 'Fill in the blank' });
+  };
+
+  buildScope();
   renderChapters();
   renderGrid();
 })();

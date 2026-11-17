@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Learn | Japanese Learning</title>
 <script>try{if(localStorage.getItem('jl_theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
@@ -50,13 +51,14 @@
   var DATA = { kanji: JL.byLevel(JL.data('kanji')), vocab: JL.byLevel(JL.data('vocab')) };
 
   var kind = 'kanji';
-  var items = [], idx = 0, revealed = false;
+  /* one independent session per kind — switching Kanji ↔ Vocabulary keeps
+     each side's session instead of wiping it */
+  var sessions = { kanji: null, vocab: null };
 
-  function selIds() { return JL.pref('sel_' + kind) || []; }
-  function setSelIds(a) { JL.pref('sel_' + kind, a); }
+  function selIds(k) { return JL.pref('sel_' + (k || kind)) || []; }
   function updateCounts() {
-    document.getElementById('k-selcount').textContent = (JL.pref('sel_kanji') || []).length;
-    document.getElementById('v-selcount').textContent = (JL.pref('sel_vocab') || []).length;
+    document.getElementById('k-selcount').textContent = selIds('kanji').length;
+    document.getElementById('v-selcount').textContent = selIds('vocab').length;
   }
 
   function renderChips() {
@@ -71,26 +73,30 @@
       b.onclick = function () {
         Array.prototype.forEach.call(el.querySelectorAll('.chip'), function (x) { x.classList.remove('active'); });
         b.classList.add('active');
-        if (b.dataset.n === 'all') start(DATA[kind]);
-        else start(DATA[kind].filter(function (it) { return (it.chapter || 0) === parseInt(b.dataset.n, 10); }));
+        if (b.dataset.n === 'all') start(DATA[kind], 'all chapters');
+        else start(DATA[kind].filter(function (it) { return (it.chapter || 0) === parseInt(b.dataset.n, 10); }), 'chapter ' + b.dataset.n);
       };
     });
   }
 
-  function startSelected() {
+  function startSelected(auto) {
     var ids = selIds();
     var list = DATA[kind].filter(function (it) { return ids.indexOf(it.id) >= 0; });
-    if (!list.length) { JL.toast('Nothing selected yet — tick items on the ' + (kind === 'kanji' ? 'Kanji' : 'Vocabulary') + ' page first.'); return; }
-    start(list);
+    if (!list.length) {
+      if (!auto) JL.toast('Nothing selected yet — tick items on the ' + (kind === 'kanji' ? 'Kanji' : 'Vocabulary') + ' page first.');
+      return false;
+    }
+    start(list, 'my selected');
+    return true;
   }
 
-  function start(list) {
-    items = JL.shuffle(list); idx = 0; revealed = false;
+  function start(list, src) {
+    sessions[kind] = { items: JL.shuffle(list), idx: 0, revealed: false, src: src || '' };
     render();
     document.getElementById('learn-area').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  function current() { return items[idx]; }
+  function current() { var s = sessions[kind]; return s ? s.items[s.idx] : null; }
 
   function front(it) {
     return '<span class="jp learn-char">' + JL.esc(kind === 'kanji' ? it.kanji : it.jp) + '</span>';
@@ -108,20 +114,22 @@
 
   function render() {
     var el = document.getElementById('learn-area');
-    if (!items.length) {
+    var s = sessions[kind];
+    if (!s || !s.items.length) {
       el.innerHTML = '<div class="notice">Pick <b>🎯 My selected</b> above to study your checked items, or tap a chapter chip to learn that whole chapter.</div>';
       return;
     }
-    var it = current();
+    var it = s.items[s.idx];
     el.innerHTML =
-      '<div class="quiz-head"><span>' + (kind === 'kanji' ? 'Kanji' : 'Vocabulary') + ' learn session · ' + (idx + 1) + '/' + items.length + '</span>' +
-      '<span class="muted">' + (revealed ? 'revealed' : 'hidden — tap Reveal when ready') + '</span></div>' +
+      '<div class="quiz-head"><span>' + (kind === 'kanji' ? 'Kanji' : 'Vocabulary') + ' learn session · ' + (s.idx + 1) + '/' + s.items.length +
+      (s.src ? ' · ' + s.src : '') + '</span>' +
+      '<span class="muted">' + (s.revealed ? 'revealed' : 'hidden — tap Reveal when ready') + '</span></div>' +
       '<div class="learn-card">' + front(it) +
-      '<div id="learn-back" style="display:' + (revealed ? 'block' : 'none') + '">' + back(it) + '</div>' +
+      '<div id="learn-back" style="display:' + (s.revealed ? 'block' : 'none') + '">' + back(it) + '</div>' +
       '<img id="learn-img" class="learn-img" alt="" style="display:none">' +
       '<div class="fc-actions" style="margin-top:16px">' +
       '<button class="btn" id="l-say">🔊 Listen</button>' +
-      '<button class="btn primary" id="l-reveal">' + (revealed ? '🙈 Hide' : '👀 Reveal') + '</button>' +
+      '<button class="btn primary" id="l-reveal">' + (s.revealed ? '🙈 Hide' : '👀 Reveal') + '</button>' +
       (kind === 'kanji'
         ? '<a class="btn ghost" id="l-write" href="write.html?tab=kanji&k=' + encodeURIComponent(it.kanji) + '">✍️ Write</a>'
         : '<a class="btn ghost" id="l-write" href="write.html?tab=vocab&v=' + encodeURIComponent(it.jp) + '">✍️ Write</a>') +
@@ -133,14 +141,14 @@
       '</div>';
 
     document.getElementById('l-say').onclick = function () { JL.speak(kind === 'kanji' ? it.kanji : it.jp); };
-    document.getElementById('l-reveal').onclick = function () { revealed = !revealed; render(); };
-    document.getElementById('l-prev').onclick = function () { idx = (idx - 1 + items.length) % items.length; revealed = false; render(); };
-    document.getElementById('l-next').onclick = function () { idx = (idx + 1) % items.length; revealed = false; render(); };
-    document.getElementById('l-shuffle').onclick = function () { items = JL.shuffle(items); idx = 0; revealed = false; render(); };
+    document.getElementById('l-reveal').onclick = function () { s.revealed = !s.revealed; render(); };
+    document.getElementById('l-prev').onclick = function () { s.idx = (s.idx - 1 + s.items.length) % s.items.length; s.revealed = false; render(); };
+    document.getElementById('l-next').onclick = function () { s.idx = (s.idx + 1) % s.items.length; s.revealed = false; render(); };
+    document.getElementById('l-shuffle').onclick = function () { s.items = JL.shuffle(s.items); s.idx = 0; s.revealed = false; render(); };
 
     if (kind === 'kanji') {
       var fid = JL.kimg.get(it.id);
-      if (fid && revealed) {
+      if (fid && s.revealed) {
         JL.files.get(fid).then(function (rec) {
           var img = document.getElementById('learn-img');
           if (rec && rec.blob && img) {
@@ -164,8 +172,10 @@
       document.querySelectorAll('.tab-panel').forEach(function (x) { x.classList.remove('active'); });
       t.classList.add('active');
       kind = t.dataset.tab;
-      items = []; idx = 0; revealed = false;
       renderChips();
+      /* each kind keeps its own session — restore it, or start this
+         kind's selected list automatically so the words stay visible */
+      if (!sessions[kind]) startSelected(true);
       render();
     };
   });
@@ -177,6 +187,11 @@
     var tabBtn = document.querySelector('.tab[data-tab="' + km[1] + '"]');
     if (tabBtn) tabBtn.click();
     startSelected();
+  } else if (selIds('vocab').length && !selIds('kanji').length) {
+    var vb = document.querySelector('.tab[data-tab="vocab"]');
+    if (vb) vb.click();
+  } else if (selIds('kanji').length) {
+    startSelected(true);
   }
   updateCounts();
   renderChips();

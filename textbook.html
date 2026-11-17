@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Library | Japanese Learning</title>
 <script>try{if(localStorage.getItem('jl_theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
@@ -35,17 +36,23 @@
   </div>
 
   <div id="reader" style="display:none">
-  <div class="toolbar">
-    <button class="btn ghost" id="back-books">📚 Books</button>
-    <select id="book-select"></select>
-    <button class="btn" id="pg-first">⏮ First</button>
-    <button class="btn" id="pg-prev">← Prev</button>
-    <span>Page <input type="number" id="pg-num" min="1" style="width:70px"> / <span id="pg-total">?</span></span>
-    <button class="btn" id="pg-next">Next →</button>
-    <button class="btn" id="pg-last">Last ⏭</button>
-    <button class="btn" id="zoom-out">➖</button>
-    <button class="btn" id="zoom-in">➕</button>
-    <button class="btn" id="mode-toggle">📜 Continuous view</button>
+  <div class="toolbar pdf-toolbar">
+    <span class="tb-group">
+      <button class="btn ghost" id="back-books">📚 Books</button>
+      <select id="book-select"></select>
+    </span>
+    <span class="tb-group">
+      <button class="btn" id="pg-first" title="First page">⏮</button>
+      <button class="btn" id="pg-prev">← Prev</button>
+      <span class="pg-ind">Page <input type="number" id="pg-num" min="1"> / <span id="pg-total">?</span></span>
+      <button class="btn" id="pg-next">Next →</button>
+      <button class="btn" id="pg-last" title="Last page">⏭</button>
+    </span>
+    <span class="tb-group">
+      <button class="btn" id="zoom-out" title="Zoom out">🔍−</button>
+      <button class="btn" id="zoom-in" title="Zoom in">🔍＋</button>
+      <button class="btn" id="mode-toggle">📜 Continuous view</button>
+    </span>
     <a class="btn ghost" id="download-book" download>⬇ Download book</a>
   </div>
 
@@ -197,6 +204,7 @@
   var ICONS = { minna: 'みん', kanji: '漢' };
   function openBook(i) {
     currentBook = BOOKS[i]; sel.value = String(i);
+    document.querySelector('main').classList.add('reader-open');
     document.getElementById('reader').style.display = '';
     document.getElementById('cat-grid').style.display = 'none';
     document.getElementById('cat-view').style.display = 'none';
@@ -205,6 +213,7 @@
   }
   document.getElementById('back-books').onclick = function () {
     pdfDoc = null;
+    document.querySelector('main').classList.remove('reader-open');
     document.getElementById('reader').style.display = 'none';
     document.getElementById('cat-view').style.display = 'none';
     document.getElementById('cat-grid').style.display = '';
@@ -336,6 +345,10 @@
       c.height = Math.floor(vp.height * dpr);
       c.style.minHeight = '';
       c.style.height = 'auto';
+      /* fixed pixel width so zoom actually changes the displayed size
+         (a 100% CSS width was cancelling the zoom before) */
+      c.style.width = Math.floor(vp.width) + 'px';
+      c.style.maxWidth = '100%';
       slot.dataset.h = String(Math.floor(vp.height));
       page.render({ canvasContext: c.getContext('2d'), viewport: vp });
     });
@@ -405,7 +418,7 @@
   });
 
   updateModeUI();
-  renderBooks();
+  renderCatGrid();
 })();
 </script>
 </body>
