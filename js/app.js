@@ -1162,6 +1162,7 @@ window.JL = (function () {
     'Someday': 'အချိန်မရွေး',
     'No tasks yet — pin your first one!': 'တာဝန် ဘာမှ မရှိသေးပါ — ပင်တပ်လိုက်ပါ!',
     'Nothing finished yet.': 'မပြီးစီးရသေးပါ။',
+    'Task updated ✏️': 'တာဝန် ပြင်ဆင်ပြီးပါပြီး ✏️',
     'Pin tasks to plan, finish them, and look back on what you did.': 'လုပ်ရမည့် တာဝန်များကို ပင်တပ်ထားပြီး ပြီးမြောက်သည့်အခါ မှတ်တမ်းတင်ပါ။',
     'Type a task first.': 'တာဝန် ရိုက်ထည့်ပါ။', 'Add / Edit': 'ထည့်ရန် / ပြင်ရန်', 'More': 'နောက်ထပ်', 'Close': 'ပိတ်မည်',
     'All': 'အားလုံး', 'All chapters': 'အခန်းအားလုံး', 'All kanji': 'ခန်းဂျိ အားလုံး',

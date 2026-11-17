@@ -45,6 +45,30 @@
   }
   .note:nth-child(2n){ transform:rotate(1.1deg); }
   .note:nth-child(3n){ transform:rotate(-.4deg); }
+  /* hover: note lifts, straightens, and grows its shadow */
+  .note { transition:transform .18s ease, box-shadow .18s ease; }
+  .note:hover {
+    transform:rotate(0deg) translateY(-5px) scale(1.03);
+    box-shadow:8px 10px 0 rgba(42,38,32,.85);
+    z-index:6;
+  }
+  /* inline edit form inside a note */
+  .note.editing { padding-top:24px; }
+  .note.editing .e-text, .note.editing .e-date {
+    display:block; width:100%; box-sizing:border-box;
+    border:2px solid #2a2620; border-radius:8px; background:#fff;
+    padding:7px 9px; font-family:inherit; font-size:.9rem; color:#2f2a22; margin-bottom:8px;
+  }
+  .note.editing .e-text:focus, .note.editing .e-date:focus { outline:2px solid var(--blue); outline-offset:2px; }
+  .e-btns { display:flex; gap:6px; }
+  .e-btns button {
+    border:2px solid #2a2620; border-radius:8px; padding:6px 12px;
+    font-family:inherit; font-weight:700; cursor:pointer; font-size:.82rem;
+    box-shadow:3px 3px 0 rgba(42,38,32,.7);
+  }
+  .e-btns .e-save { background:var(--blue); color:#fff; }
+  .e-btns .e-cancel { background:#fffdf5; color:#2f2a22; }
+  .e-btns button:active { transform:translate(1px,1px); box-shadow:1px 1px 0 rgba(42,38,32,.7); }
   /* pin head, sitting on top of the paper edge */
   .note::before {
     content:''; position:absolute; top:-11px; left:50%; margin-left:-9px;
@@ -97,7 +121,9 @@
     box-shadow:6px 7px 0 rgba(42,38,32,.85);
     padding:20px 14px 14px; display:flex; gap:8px; flex-wrap:wrap;
     max-width:680px; margin:0 auto 30px;
+    transition:transform .18s ease, box-shadow .18s ease;
   }
+  .add-strip:hover { transform:rotate(0deg) translateY(-2px); box-shadow:8px 9px 0 rgba(42,38,32,.85); }
   .add-strip::before {
     content:''; position:absolute; top:-10px; left:24px; width:16px; height:16px; border-radius:50%;
     background:radial-gradient(circle at 32% 28%, #bcd9ff, var(--blue) 58%, #12263f);
@@ -189,7 +215,7 @@
         : (t.due < td ? '<span class="badge ov">Overdue</span>' : ''));
       return '<div class="' + cls + '" data-id="' + t.id + '"><span class="pin-hole"></span><div class="task-text">' + JL.esc(t.text) + '</div>' +
         '<div class="meta">' + (t.due ? '<span>📅 ' + JL.esc(fmtD(t.due)) + '</span>' : '') + badge + '</div>' +
-        '<div class="note-actions"><button class="act-done" title="Mark done">✓</button><button class="act-del" title="Delete">🗑️</button></div></div>';
+        '<div class="note-actions"><button class="act-done" title="Mark done">✓</button><button class="act-edit" title="Edit">✏️</button><button class="act-del" title="Delete">🗑️</button></div></div>';
     }).join('') || '<p class="empty-note">No tasks yet — pin your first one!</p>';
 
     document.getElementById('fin-notes').innerHTML = fin.map(function (t) {
@@ -212,6 +238,26 @@
       if ((b = n.querySelector('.act-undo'))) b.onclick = function () {
         TASKS.forEach(function (t) { if (String(t.id) === id) { t.done = false; t.doneAt = null; } });
         save(); render();
+      };
+      if ((b = n.querySelector('.act-edit'))) b.onclick = function () {
+        var t = null;
+        TASKS.forEach(function (x) { if (String(x.id) === id) t = x; });
+        if (!t) return;
+        n.classList.add('editing');
+        n.innerHTML = '<span class="pin-hole"></span>' +
+          '<input class="e-text" maxlength="120" value="' + JL.esc(t.text).replace(/"/g, '&quot;') + '">' +
+          '<input type="date" class="e-date" value="' + (t.due || '') + '">' +
+          '<div class="e-btns"><button class="e-save">Save</button><button class="e-cancel">Cancel</button></div>';
+        var inp = n.querySelector('.e-text'), dt = n.querySelector('.e-date');
+        function doSave() {
+          var v = inp.value.trim();
+          if (!v) { JL.toast('Type a task first.', 'err'); inp.focus(); return; }
+          t.text = v; t.due = dt.value || '';
+          save(); render(); JL.toast('Task updated ✏️', 'ok');
+        }
+        n.querySelector('.e-save').onclick = doSave;
+        n.querySelector('.e-cancel').onclick = function () { render(); };
+        inp.focus();
       };
       if ((b = n.querySelector('.act-del'))) b.onclick = function () {
         TASKS = TASKS.filter(function (t) { return String(t.id) !== id; });
