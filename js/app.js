@@ -981,7 +981,7 @@ window.JL = (function () {
   }
   function navigate(href, push, opts) {
     if (router.busy) return;
-    router.busy = true;
+    router.busy = true; router.busyAt = Date.now();
     var pathOnly = href.split('?')[0];
     fetch(pathOnly).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1028,6 +1028,11 @@ window.JL = (function () {
       var p = location.pathname.split('/').pop() || 'index.html';
       navigate(p + location.search, false);
     });
+    /* safety: if a navigation ever hangs (e.g. a CDN script stalls), unstick
+       the router so header links keep working */
+    setInterval(function () {
+      if (router.busy && Date.now() - (router.busyAt || 0) > 8000) { router.busy = false; router.busyAt = 0; }
+    }, 3000);
   }
 
   /* ---------- unified chapter list (shared by every page) ---------- */
@@ -1248,6 +1253,22 @@ window.JL = (function () {
     /* full re-render where the page has no in-progress state */
     if (!refreshBlocked()) refreshPage();
   }
+
+  /* diagnostics: surface uncaught errors instead of failing silently —
+     shows a toast and remembers the last error for support */
+  window.addEventListener('error', function (ev) {
+    try {
+      var msg = (ev && ev.message) ? ev.message : 'unknown error';
+      try { localStorage.setItem('jl_lasterr', new Date().toISOString() + ' | ' + msg + ' | ' + String((ev && ev.filename) || '').split('/').pop() + ':' + ((ev && ev.lineno) || 0)); } catch (e2) {}
+      if (typeof toast === 'function') toast('⚠️ Page error: ' + msg);
+    } catch (e) {}
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    try {
+      var r = ev && ev.reason; var msg = (r && r.message) ? r.message : String(r || 'unhandled rejection');
+      try { localStorage.setItem('jl_lasterr', new Date().toISOString() + ' | promise: ' + msg); } catch (e2) {}
+    } catch (e) {}
+  });
 
   /* ---------- public API ---------- */
   return {

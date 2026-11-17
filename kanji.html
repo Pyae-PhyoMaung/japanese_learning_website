@@ -83,6 +83,7 @@
 
   var state = { chapter: 0, q: '' };
   var view = 'chapters', selectMode = false;
+  var pushedK = false; /* true when openDetail pushed a ?k= history entry */
 
   /* chapter buttons — kanji live under their chapter, shown on tap */
   function renderChapters() {
@@ -193,7 +194,7 @@
     document.getElementById('k-selcount').textContent = sel.length;
   }
 
-  function openDetail(k) {
+  function openDetail(k, fromUrl) {
     if (!k) return;
     var ex = (k.examples || []).map(function (e) {
       return '<div class="example"><button class="speak" data-say="' + JL.esc(e.word) + '">🔊</button>' +
@@ -216,6 +217,12 @@
     });
     renderImgBox(k);
     document.getElementById('k-modal').classList.remove('hidden');
+    /* remember the open kanji in the URL so browser-back from the writing
+       page returns to THIS kanji's detail (not the whole list) */
+    try {
+      if (fromUrl) history.replaceState(history.state, '', '?k=' + encodeURIComponent(k.kanji));
+      else { history.pushState({ k: k.kanji }, '', '?k=' + encodeURIComponent(k.kanji)); pushedK = true; }
+    } catch (e) {}
   }
 
   /* per-kanji memory image: upload, pick from files, change, remove */
@@ -290,10 +297,26 @@
       document.getElementById('k-img-back').onclick = function () { renderImgBox(k); };
     });
   }
-  document.getElementById('k-modal-close').onclick = function () { document.getElementById('k-modal').classList.add('hidden'); };
+  function closeDetail() {
+    document.getElementById('k-modal').classList.add('hidden');
+    if (location.search.indexOf('k=') >= 0) {
+      if (pushedK) { pushedK = false; history.back(); } /* popstate re-renders the list */
+      else try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    }
+  }
+  document.getElementById('k-modal-close').onclick = closeDetail;
   document.getElementById('k-modal').onclick = function (e) {
-    if (e.target === document.getElementById('k-modal')) document.getElementById('k-modal').classList.add('hidden');
+    if (e.target === document.getElementById('k-modal')) closeDetail();
   };
+
+  /* deep link: kanji.html?k=X opens X's detail directly (also used by
+     browser-back from the writing page) */
+  (function () {
+    var m = location.search.match(/[?&]k=([^&]+)/);
+    if (!m) return;
+    var k = ALL.find(function (x) { return x.kanji === decodeURIComponent(m[1]); });
+    if (k) openDetail(k, true);
+  })();
 
   document.getElementById('k-search').oninput = function () {
     state.q = this.value.trim();
