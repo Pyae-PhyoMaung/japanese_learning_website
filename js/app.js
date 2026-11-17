@@ -586,43 +586,64 @@ window.JL = (function () {
   }
 
   /* ---------- navigation ---------- */
-  var NAV = [
-    { href: 'index.html', icon: '🏠', label: 'Home' },
-    { href: 'textbook.html', icon: '📖', label: 'Library' },
-    { href: 'learn.html', icon: '🎯', label: 'Learn' },
-    { href: 'kanji.html', icon: '漢', label: 'Kanji' },
-    { href: 'vocab.html', icon: '語', label: 'Vocabulary' },
-    { href: 'dictionary.html', icon: '辞', label: 'Dictionary' },
-    { href: 'write.html', icon: '✍️', label: 'Writing' },
-    { href: 'kana.html', icon: 'あ', label: 'Kana' },
-    { href: 'grammar.html', icon: '文', label: 'Grammar' },
-    { href: 'listening.html', icon: '🎧', label: 'Listening' },
-    { href: 'tests.html', icon: '📝', label: 'Tests' },
-    { href: 'files.html', icon: '🗂️', label: 'Files' },
-    { href: 'partner.html', icon: '🤝', label: 'Study Partner' },
-    { href: 'edit.html', icon: '⚙️', label: 'Add / Edit' }
+  /* grouped header: Home + three dropdown groups + Add/Edit + control cluster.
+     Top level is text-only (icons live inside the dropdown panels). */
+  var NAV_GROUPS = [
+    { label: 'Learn', items: [
+      { href: 'learn.html', icon: '🎯', label: 'Learn' },
+      { href: 'kanji.html', icon: '漢', label: 'Kanji' },
+      { href: 'vocab.html', icon: '語', label: 'Vocabulary' },
+      { href: 'kana.html', icon: 'あ', label: 'Kana' },
+      { href: 'grammar.html', icon: '文', label: 'Grammar' }
+    ] },
+    { label: 'Practice', items: [
+      { href: 'write.html', icon: '✍️', label: 'Writing' },
+      { href: 'listening.html', icon: '🎧', label: 'Listening' },
+      { href: 'tests.html', icon: '📝', label: 'Tests' }
+    ] },
+    { label: 'Tools', items: [
+      { href: 'dictionary.html', icon: '辞', label: 'Dictionary' },
+      { href: 'textbook.html', icon: '📖', label: 'Library' },
+      { href: 'files.html', icon: '🗂️', label: 'Files' },
+      { href: 'partner.html', icon: '🤝', label: 'Study Partner' }
+    ] }
   ];
-  /* first NAV_PRIMARY links stay visible on phones; the rest live under More */
-  var NAV_PRIMARY = 5;
   function renderNav() {
     var el = document.getElementById('nav');
     if (!el) return;
     var page = (location.pathname.split('/').pop() || 'index.html');
-    var hiddenActive = false;
-    el.innerHTML = NAV.map(function (n, i) {
-      var act = n.href === page;
-      if (act && i >= NAV_PRIMARY) hiddenActive = true;
-      return '<a class="' + (act ? 'active' : '') + (i >= NAV_PRIMARY ? ' nav-extra' : '') + '" href="' + n.href + '"><span class="ic">' + n.icon + '</span>' + tt(n.label) + '</a>';
-    }).join('') +
-      '<button class="nav-more-btn' + (hiddenActive ? ' has-active' : '') + '" id="nav-more" type="button">☰ ' + tt('More') + '</button>' +
+    var html = '<a class="nav-link' + (page === 'index.html' ? ' active' : '') + '" href="index.html">' + tt('Home') + '</a>';
+    NAV_GROUPS.forEach(function (g) {
+      var hasActive = g.items.some(function (n) { return n.href === page; });
+      html += '<div class="nav-group' + (hasActive ? ' has-active' : '') + '">' +
+        '<button class="nav-link nav-drop-btn" type="button">' + tt(g.label) + '<span class="caret">▾</span></button>' +
+        '<div class="nav-menu">' + g.items.map(function (n) {
+          return '<a class="' + (n.href === page ? 'active' : '') + '" href="' + n.href + '"><span class="ic">' + n.icon + '</span>' + tt(n.label) + '</a>';
+        }).join('') + '</div></div>';
+    });
+    html += '<a class="nav-link nav-edit' + (page === 'edit.html' ? ' active' : '') + '" href="edit.html">' + tt('Add / Edit') + '</a>' +
       '<button class="nav-sync-btn" id="nav-refresh" type="button" title="Check for new data">↻</button>' +
       '<button class="nav-lang-btn" id="nav-lang" type="button" title="Myanmar / English">' + (langPref() === 'mm' ? tt('English') : 'မြန်မာ') + '</button>' +
       '<button class="nav-theme-btn" id="nav-theme" type="button" title="Light / dark theme">' + (getTheme() === 'dark' ? '☀️' : '🌙') + '</button>';
-    var more = document.getElementById('nav-more');
-    if (more) more.onclick = function () {
-      var open = el.classList.toggle('nav-open');
-      more.textContent = open ? '✕ ' + tt('Close') : '☰ ' + tt('More');
-    };
+    el.innerHTML = html;
+    /* dropdowns: hover on desktop (CSS), tap-toggle on touch, outside click closes */
+    Array.prototype.forEach.call(el.querySelectorAll('.nav-group'), function (grp) {
+      var btn = grp.querySelector('.nav-drop-btn');
+      if (btn) btn.onclick = function (e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        var was = grp.classList.contains('open');
+        Array.prototype.forEach.call(el.querySelectorAll('.nav-group.open'), function (o) { o.classList.remove('open'); });
+        if (!was) grp.classList.add('open');
+      };
+    });
+    if (!renderNav._outsideBound) {
+      renderNav._outsideBound = true;
+      document.addEventListener('click', function () {
+        var nav = document.getElementById('nav');
+        if (!nav) return;
+        Array.prototype.forEach.call(nav.querySelectorAll('.nav-group.open'), function (o) { o.classList.remove('open'); });
+      });
+    }
     var rf = document.getElementById('nav-refresh');
     if (rf) rf.onclick = function () {
       rf.classList.add('spin');
@@ -1112,7 +1133,7 @@ window.JL = (function () {
   var MM = {
     'Home': 'ပင်မ', 'Library': 'စာကြည့ိတိုက်', 'Learn': 'လေ့လာ', 'Kanji': 'ခန်းဂျိ',
     'Vocabulary': 'အသုံးအနှုန်း', 'Dictionary': 'အဘိဓာန်', 'Writing': 'စာရေးခြင်း', 'Kana': 'ခါနာ',
-    'Grammar': 'သဒ္ဒါ', 'Listening': 'နားထောင်ခြင်း', 'Tests': 'စမ်းသပ်များ', 'Files': 'ဖိုင်များ',
+    'Grammar': 'သဒ္ဒါ', 'Listening': 'နားထောင်ခြင်း', 'Tests': 'စမ်းသပ်များ', 'Practice': 'လေ့ကျင့်ခန်း', 'Tools': 'ကိရိယာများ', 'Files': 'ဖိုင်များ',
     'Study Partner': 'လေ့လာမိတ်ဆွေ', 'Add / Edit': 'ထည့်ရန် / ပြင်ရန်', 'More': 'နောက်ထပ်', 'Close': 'ပိတ်ရန်',
     'All': 'အားလုံး', 'All chapters': 'အခန်းအားလုံး', 'All kanji': 'ခန်းဂျိ အားလုံး',
     'All words': 'စကားလုံး အားလုံး', 'All sentences': 'ဝါကျ အားလုံး', 'All grammar': 'သဒ္ဒါ အားလုံး',
