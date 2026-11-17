@@ -612,23 +612,32 @@ window.JL = (function () {
     el.innerHTML = NAV.map(function (n, i) {
       var act = n.href === page;
       if (act && i >= NAV_PRIMARY) hiddenActive = true;
-      return '<a class="' + (act ? 'active' : '') + (i >= NAV_PRIMARY ? ' nav-extra' : '') + '" href="' + n.href + '"><span class="ic">' + n.icon + '</span>' + n.label + '</a>';
+      return '<a class="' + (act ? 'active' : '') + (i >= NAV_PRIMARY ? ' nav-extra' : '') + '" href="' + n.href + '"><span class="ic">' + n.icon + '</span>' + tt(n.label) + '</a>';
     }).join('') +
-      '<button class="nav-more-btn' + (hiddenActive ? ' has-active' : '') + '" id="nav-more" type="button">☰ More</button>' +
-      '<button class="nav-sync-btn" id="nav-refresh" type="button" title="Check for new data">↻</button>';
+      '<button class="nav-more-btn' + (hiddenActive ? ' has-active' : '') + '" id="nav-more" type="button">☰ ' + tt('More') + '</button>' +
+      '<button class="nav-sync-btn" id="nav-refresh" type="button" title="Check for new data">↻</button>' +
+      '<button class="nav-lang-btn" id="nav-lang" type="button" title="Myanmar / English">' + (langPref() === 'mm' ? tt('English') : 'မြန်မာ') + '</button>' +
+      '<button class="nav-theme-btn" id="nav-theme" type="button" title="Light / dark theme">' + (getTheme() === 'dark' ? '☀️' : '🌙') + '</button>';
     var more = document.getElementById('nav-more');
     if (more) more.onclick = function () {
       var open = el.classList.toggle('nav-open');
-      more.textContent = open ? '✕ Close' : '☰ More';
+      more.textContent = open ? '✕ ' + tt('Close') : '☰ ' + tt('More');
     };
     var rf = document.getElementById('nav-refresh');
     if (rf) rf.onclick = function () {
       rf.classList.add('spin');
       pullUserData(function (r) {
         rf.classList.remove('spin');
-        if (r && r.updated && r.pending) JL.toast('New data is ready — it will load when you leave this page.', 'ok');
-        else JL.toast(r && r.updated ? 'Data updated ✓' : 'Already up to date', 'ok');
+        if (r && r.updated && r.pending) JL.toast(tt('New data is ready — it will load when you leave this page.'), 'ok');
+        else JL.toast(r && r.updated ? tt('Data updated ✓') : tt('Already up to date'), 'ok');
       });
+    };
+    var lb = document.getElementById('nav-lang');
+    if (lb) lb.onclick = function () { setLang(langPref() === 'mm' ? 'en' : 'mm'); };
+    var tb = document.getElementById('nav-theme');
+    if (tb) tb.onclick = function () {
+      toggleTheme();
+      tb.textContent = getTheme() === 'dark' ? '☀️' : '🌙';
     };
   }
 
@@ -943,7 +952,7 @@ window.JL = (function () {
     Promise.all(jobs).then(done, done);
   }
   function runScripts(scripts, i) {
-    if (i >= scripts.length) { JL.renderNav(); JL.initCatToggle(); JL.levelBar(); JL.sync.pull(); return; }
+    if (i >= scripts.length) { JL.renderNav(); JL.initCatToggle(); JL.levelBar(); JL.translateNode(document.body); JL.sync.pull(); return; }
     var s = document.createElement('script');
     s.text = scripts[i];
     document.body.appendChild(s);
@@ -1080,6 +1089,145 @@ window.JL = (function () {
     return fb || '';
   }
 
+  /* ---------- UI language (English / Myanmar) + theme (light / dark) ---------- */
+  var THEME_KEY = 'jl_theme';
+  function getTheme() {
+    try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; }
+  }
+  function applyTheme() {
+    try { document.documentElement.setAttribute('data-theme', getTheme()); } catch (e) {}
+  }
+  function setTheme(th) {
+    try {
+      if (th === 'dark') localStorage.setItem(THEME_KEY, 'dark');
+      else localStorage.removeItem(THEME_KEY);
+    } catch (e) {}
+    applyTheme();
+  }
+  function toggleTheme() { setTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
+
+  /* Myanmar UI dictionary: exact English phrase -> Myanmar phrase. Anything
+     not listed stays in English. Keys are matched against the trimmed text
+     of every text node (static and dynamically inserted), and via tt(). */
+  var MM = {
+    'Home': 'ပင်မ', 'Library': 'စာကြည့ိတိုက်', 'Learn': 'လေ့လာ', 'Kanji': 'ခန်းဂျိ',
+    'Vocabulary': 'အသုံးအနှုန်း', 'Dictionary': 'အဘိဓာန်', 'Writing': 'စာရေးခြင်း', 'Kana': 'ခါနာ',
+    'Grammar': 'သဒ္ဒါ', 'Listening': 'နားထောင်ခြင်း', 'Tests': 'စမ်းသပ်များ', 'Files': 'ဖိုင်များ',
+    'Study Partner': 'လေ့လာမိတ်ဆွေ', 'Add / Edit': 'ထည့်ရန် / ပြင်ရန်', 'More': 'နောက်ထပ်', 'Close': 'ပိတ်ရန်',
+    'All': 'အားလုံး', 'All chapters': 'အခန်းအားလုံး', 'All kanji': 'ခန်းဂျိ အားလုံး',
+    'All words': 'စကားလုံး အားလုံး', 'All sentences': 'ဝါကျ အားလုံး', 'All grammar': 'သဒ္ဒါ အားလုံး',
+    'All levels': 'အဆင့် အားလုံး', 'Chapters': 'အခန်းများ', 'Level': 'အဆင့်', 'Title': 'ခေါင်းစဉ်',
+    'Meaning': 'အဓိပ္ပာယ်', 'Category': 'အမျိုးအစား', 'Pattern': 'ပုံစံ', 'Explanation': 'ရှင်းလင်းချက်',
+    'Japanese': 'ဂျပန်', 'Reading': 'ဖတ်ပုံ', 'Romaji': 'ရိုမာဂျိ', 'Vocab': 'စကားလုံး',
+    'Listen': 'နားထောင်ရန်', 'Open': 'ဖွင့်ရန်', 'Save': 'သိမ်းရန်', 'Cancel': 'ပယ်ဖျက်ရန်',
+    'Delete': 'ဖျက်ရန်', 'Edit': 'ပြင်ရန်', 'Search': 'ရှာဖွေရန်', 'Back': 'နောက်သို့', 'Next': 'ရှေ့သို့',
+    'Clear': 'ရှင်းရန်', 'Undo': 'ပြန်ဖျက်ရန်', 'Score': 'အမှတ်', 'Review': 'ပြန်သုံးသပ်ရန်',
+    'Select': 'ရွေးရန်', 'Selected': 'ရွေးချယ်ပြီး', 'Backup': 'အရံသိမ်းခြင်း', 'Words': 'စကားလုံးများ',
+    'Sentences': 'ဝါကျများ', 'Type': 'အမျိုးအစား', 'Size': 'အရွယ်အစား', 'On': 'အွန်', 'Kun': 'ကွန်',
+    'Correct!': 'မှန်ပါသည်!', 'Wrong!': 'မှားပါသည်', 'Show answer': 'အဖြေ ပြရန်', 'Reveal': 'အဖြေ ပြရန်',
+    'English': 'အင်္ဂလိပ်', 'English meaning': 'အင်္ဂလိပ် အဓိပ္ပာယ်', 'Burmese meaning': 'မြန်မာ အဓိပ္ပာယ်',
+    '🔊 Listen': '🔊 နားထောင်ရန်', 'Next →': 'ရှေ့သို့ →', '← Prev': '← နောက်သို့', '🧹 Clear': '🧹 ရှင်းရန်',
+    '↩ Undo stroke': '↩ စုတ်တံ ပြန်ဖျက်ရန်', '👁 Hide guide': '👁 လမ်းညွှန် ဖျက်ရန်', '— no chapter —': '— အခန်း မရှိ —',
+    '✨ New / clear': '✨ အသစ် / ရှင်းရန်', '📚 Chapters': '📚 အခန်းများ', '🗑 Delete': '🗑 ဖျက်ရန်',
+    'My Files': 'ကျွန်ုပ်၏ ဖိုင်များ', '🗂️ My Files': '🗂️ ကျွန်ုပ်၏ ဖိုင်များ', '✍️ Write': '✍️ ရေးရန်',
+    'Flashcards': 'ဖလက်ရှ်ကတ်များ', 'Start flashcards': 'ဖလက်ရှ်ကတ် စတင်ရန်', 'Start quiz': 'စမ်းသပ်မှု စတင်ရန်',
+    'Start quiz (10 questions)': 'စမ်းသပ်မှု စတင်ရန် (မေးခွန်း ၁၀ ခု)', 'Next word →': 'နောက် စကားလုံး →',
+    '← Prev word': '← နောက် စကားလုံး', 'My tests': 'ကျွန်ုပ်၏ စမ်းသပ်မှုများ', 'Your tests': 'သင်၏ စမ်းသပ်မှုများ',
+    'No matches.': 'တွေ့ရှိမှု မရှိပါ။', 'No tests yet.': 'စမ်းသပ်မှု မရှိသေးပါ။',
+    '💾 Save quiz': '💾 စမ်းသပ်မှု သိမ်းရန်', '💾 Save deck': '💾 ကတ်ပြား သိမ်းရန်', '💾 Save word': '💾 စကားလုံး သိမ်းရန်',
+    '💾 Save kanji': '💾 ခန်းဂျိ သိမ်းရန်', '💾 Save grammar point': '💾 သဒ္ဒာအချက် သိမ်းရန်',
+    '💾 Add / update chapter': '💾 အခန်း ထည့်ရန် / ပြင်ရန်', '✏️ Rename': '✏️ အမည်ပြောင်းရန်', '✏️ Edit': '✏️ ပြင်ရန်',
+    '➕ Add vocabulary': '➕ စကားလုံး ထည့်ရန်', '➕ Add kanji': '➕ ခန်းဂျိ ထည့်ရန်', '➕ Add grammar point': '➕ သဒ္ဒာအချက် ထည့်ရန်',
+    '➕ Build your own quiz': '➕ ကိုယ်ပိုင် စမ်းသပ်မှု ဖန်တီးရန်', '➕ Build a flashcard deck': '➕ ဖလက်ရှ်ကတ်ပြား ဖန်တီးရန်',
+    '💾 Backup your additions': '💾 ထည့်သွင်းမှုများ အရံသိမ်းရန်', '⬇ Download': '⬇ ဒေါင်းလုဒ် ရန်',
+    '⬇ Download book': '⬇ စာအုပ် ဒေါင်းလုဒ် ရန်', '⬇ Export my data (JSON)': '⬇ ဒေတာ ထုတ်ယူရန် (JSON)',
+    '⬆ Import backup': '⬆ အရံသိမ်းချက် ထည့်သွင်းရန်', '⬆ Upload': '⬆ တင်ရန်',
+    '♻️ Restore all deleted base items': '♻️ ဖျက်ထားသော မူလအရာများ အားလုံး ပြန်ယူရန်',
+    '🗑 Reset ALL my changes': '🗑 ကျွန်ုပ်၏ ပြောင်းလဲမှုများ အားလုံး ပြန်စတင်ရန်',
+    '+ Add example': '+ ဥပမာ ထည့်ရန်', '+ Add exercise': '+ လေ့ကျင့်ခန်း ထည့်ရန်', '+ Add example word': '+ ဥပမာ စကားလုံး ထည့်ရန်',
+    '+ Add question': '+ မေးခွန်း ထည့်ရန်', '+ Add card': '+ ကတ်ပြား ထည့်ရန်',
+    '🐢 Slow': '🐢 နှေး', '🔁 Replay': '🔁 ပြန်ဖွင့်ရန်', '✕ Clear': '✕ ရှင်းရန်',
+    '✕ Clear selection': '✕ ရွေးချယ်မှု ရှင်းရန်', '☑ Select': '☑ ရွေးရန်', 'Clear selection': 'ရွေးချယ်မှု ရှင်းရန်',
+    '🔍 Search': '🔍 ရှာဖွေရန်', '👀 Show word': '👀 စကားလုံး ပြရန်', '👀 Show sentence': '👀 ဝါကျ ပြရန်',
+    '👀 See': '👀 ကြည့်ရန်', 'Next sentence →': 'နောက် ဝါကျ →', '✓ Check': '✓ စစ်ဆေးရန်',
+    '💡 Give up': '💡 လက်လျှော့ရန်', '🔀 Shuffle': '🔀 ရောနှောရန်', '👀 Reveal': '👀 အဖြေပြရန်', '🙈 Hide': '🙈 ဖျက်ရန်',
+    'Send ➤': 'ပို့ရန် ➤', '＋ New chat': '＋ စကားဝိုင်း အသစ်', '⏮ First': '⏮ ပထမ', 'Last ⏭': 'နောက်ဆုံး ⏭',
+    '📖 Open in Library': '📖 စာကြည့ိတိုက်တွင် ဖွင့်ရန်', '▶ Take': '▶ ဖြေရန်', '▶ Take this test': '▶ ဤစမ်းသပ်မှုကို ဖြေရန်',
+    '▶ Take this quiz again': '▶ ဤစမ်းသပ်မှုကို ထပ်ဖြေရန်',
+    '🔊 Listen to the word': '🔊 စကားလုံးကို နားထောင်ရန်', '🔊 Listen to word': '🔊 စကားလုံးကို နားထောင်ရန်',
+    '🔊 Listen to the kanji': '🔊 ခန်းဂျိကို နားထောင်ရန်',
+    '✍️ Practice writing': '✍️ စာရေး လေ့ကျင့်ရန်', '✍️ Write it': '✍️ ရေးပါ',
+    '↩ Back': '↩ နောက်သို့', '🔄 Change image': '🔄 ပုံ ပြောင်းရန်', '🗑 Remove': '🗑 ဖယ်ရှားရန်',
+    '⬆️ Upload image': '⬆️ ပုံ တင်ရန်', '🗂️ Pick from my files': '🗂️ ဖိုင်များမှ ရွေးရန်',
+    '➖ Zoom out': '➖ ချုံ့ရန်', '➕ Zoom in': '➕ ချဲ့ရန်', '↺ 100%': '↺ ၁၀၀%',
+    'Open in new tab ↗': 'တက်ပ်အသစ်တွင် ဖွင့်ရန် ↗', '👁 Open': '👁 ဖွင့်ရန်',
+    'My Library': 'ကျွန်ုပ်၏ စာကြည့ိတိုက်', '📖 My Library': '📖 ကျွန်ုပ်၏ စာကြည့ိတိုက်',
+    '🗂️ Categories': '🗂️ အမျိုးအစားများ', '📚 Books': '📚 စာအုပ်များ',
+    'Writing practice': 'စာရေး လေ့ကျင့်ခန်း', 'Writing Practice': 'စာရေး လေ့ကျင့်ခန်း',
+    'Kanji Writing Practice': 'ခန်းဂျိ စာရေး လေ့ကျင့်ခန်း', 'Vocabulary Writing Practice': 'စကားလုံး စာရေး လေ့ကျင့်ခန်း',
+    'Practice Tests': 'လေ့ကျင့် စမ်းသပ်မှုများ', 'Learn Session': 'လေ့လာမှု', 'Listening Session': 'နားထောင်မှု',
+    'Data updated ✓': 'ဒေတာ အသစ်သို့ ပြောင်းပြီးပါပြီ ✓', 'Already up to date': 'ဒေတာသည် နောက်ဆုံးအခြေအနေတွင် ရှိပါသည်',
+    'New data is ready — it will load when you leave this page.': 'ဒေတာအသစ် ရှိပါသည် — ဤစာမျက်နှာမှ ထွက်သွားပါက ပြောင်းလဲပါမည်။',
+    'Ch.': 'အခန်း', 'Chapter no.': 'အခန်း အမှတ်', 'Quiz title': 'စမ်းသပ်မှု ခေါင်းစဉ်', 'Deck title': 'ကတ်ပြား ခေါင်းစဉ်',
+    'On readings (comma separated)': 'အွန် ဖတ်ပုံများ (ကော်မာဖြင့် ခွဲရန်)', 'Kun reading': 'ကွန် ဖတ်ပုံ',
+    'Japanese (word)': 'ဂျပန် (စကားလုံး)', 'Reading (kana)': 'ဖတ်ပုံ (ခါနာ)',
+    'Synonyms (comma separated)': 'ပြိုင်စကားလုံးများ (ကော်မာဖြင့် ခွဲရန်)', 'Antonyms (comma separated)': 'ဆန့်ကျင်စကားလုံးများ (ကော်မာဖြင့် ခွဲရန်)',
+    'Lesson no. (reference)': 'သင်ခန်းစာ အမှတ် (အညွှန်း)',
+    'Essential / my words': 'အဓိက / ကျွန်ုပ်၏ စကားလုံးများ', 'Essential & my words': 'အဓိက & ကျွန်ုပ်၏ စကားလုံးများ',
+    'Kanji entries': 'ခန်းဂျိ အရေအတွက်', 'Vocabulary words': 'စကားလုံး အရေအတွက်',
+    'Grammar points': 'သဒ္ဒာ အချက်များ', 'Listening sentences': 'နားထောင်ရမည့် ဝါကျများ',
+    'Your custom tests': 'သင်၏ ကိုယ်ပိုင် စမ်းသပ်မှုများ', 'Add / Edit Content': 'အကြောင်းအရာ ထည့်ရန် / ပြင်ရန်',
+    'Kanji Learning & Practice': 'ခန်းဂျိ လေ့လာခြင်းနှင့် လေ့ကျင့်ခန်း', 'Vocabulary Learning & Practice': 'စကားလုံး လေ့လာခြင်းနှင့် လေ့ကျင့်ခန်း',
+    'Grammar Learning & Exercises': 'သဒ္ဒါ လေ့လာခြင်းနှင့် လေ့ကျင့်ခန်း',
+    'No sentences in this chapter yet.': 'ဤအခန်းတွင် ဝါကျများ မရှိသေးပါ။',
+    'Characters in this word — tap to practice one:': 'ဤစကားလုံးရှိ စာလုံးများ — လေ့ကျင့်ရန် နှိပ်ပါ:'
+  };
+  function langPref() { return pref('lang') === 'mm' ? 'mm' : 'en'; }
+  function tt(s) { return (langPref() === 'mm' && MM[s]) ? MM[s] : s; }
+  var MM_REV = null;
+  function revMap() {
+    if (!MM_REV) { MM_REV = {}; for (var k in MM) if (MM[k]) MM_REV[MM[k]] = k; }
+    return MM_REV;
+  }
+  function translateNode(root) {
+    if (!root) return;
+    var mm = langPref() === 'mm', map = mm ? MM : revMap();
+    (function walk(n) {
+      if (!n) return;
+      if (n.nodeType === 3) {
+        var s = n.nodeValue, key = s.replace(/^\s+|\s+$/g, '');
+        if (key && map[key]) n.nodeValue = s.replace(key, map[key]);
+      } else if (n.nodeType === 1 && !/^(script|style)$/i.test(n.tagName)) {
+        /* in English mode never touch Japanese / Myanmar data content */
+        if (!mm && typeof n.className === 'string' && /(^|\s)(jp|mm)(\s|$)/.test(n.className)) return;
+        for (var i = 0; i < n.childNodes.length; i++) walk(n.childNodes[i]);
+      }
+    })(root);
+  }
+  var langObserver = null;
+  function watchLang() {
+    if (langPref() !== 'mm' || langObserver || typeof MutationObserver === 'undefined') return;
+    try {
+      langObserver = new MutationObserver(function (muts) {
+        if (langPref() !== 'mm') return;
+        for (var i = 0; i < muts.length; i++) {
+          var m = muts[i];
+          if (m.type === 'characterData') translateNode(m.target);
+          else if (m.addedNodes) for (var j = 0; j < m.addedNodes.length; j++) translateNode(m.addedNodes[j]);
+        }
+      });
+      langObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    } catch (e) {}
+  }
+  function setLang(l) {
+    pref('lang', l === 'mm' ? 'mm' : 'en');
+    renderNav();
+    translateNode(document.body);
+    watchLang();
+    /* full re-render where the page has no in-progress state */
+    if (!refreshBlocked()) refreshPage();
+  }
+
   /* ---------- public API ---------- */
   return {
     data: merged, save: save, remove: remove, restore: restore,
@@ -1089,7 +1237,9 @@ window.JL = (function () {
     files: { list: filesList, put: filePut, get: fileGet, del: fileDel, cat: fileCat },
     sync: { push: pushUserData, pull: pullUserData, live: startLiveSync },
     pref: pref, chapters: chapters, chapterTitle: chapterTitle, kimg: { get: kimgGet, set: kimgSet }, mmfix: mmfixValue,
+    t: tt, translateNode: translateNode, watchLang: watchLang, lang: { get: langPref, set: setLang },
+    applyTheme: applyTheme, theme: { get: getTheme, set: setTheme, toggle: toggleTheme },
     level: level, setLevel: setLevel, byLevel: byLevel, levelBar: mountLevelBar, LEVELS: LEVELS
   };
 })();
-document.addEventListener('DOMContentLoaded', function () { JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.levelBar(); JL.titleIcons(); JL.sync.pull(); JL.sync.live(); });
+document.addEventListener('DOMContentLoaded', function () { JL.applyTheme(); JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.levelBar(); JL.titleIcons(); JL.translateNode(document.body); JL.watchLang(); JL.sync.pull(); JL.sync.live(); });
