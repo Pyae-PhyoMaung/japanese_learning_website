@@ -1090,9 +1090,33 @@ window.JL = (function () {
     pref('level', l);
     refreshPage(); /* re-run the current page with the new level's data */
   }
-  function byLevel(arr) {
-    var l = level();
+  function byLevel(arr, lvl) {
+    var l = lvl || level();
     return (arr || []).filter(function (it) { return it && (it.level || 'N5') === l; });
+  }
+  /* kanji example words surfaced as read-only vocabulary — shared by the
+     Vocabulary page and the Add/Edit vocab list so their counts always
+     agree. Derived on the fly, never stored: id 'kex_<kanjiId>_<i>',
+     .kex = the source kanji, chapter/level from the kanji. Deduped by word
+     against real vocab of the same level and among themselves. */
+  function kexVocab(lvl) {
+    var kl = lvl || level();
+    var have = {};
+    byLevel(merged('vocab'), kl).forEach(function (v) { if (v.jp) have[v.jp] = true; });
+    var out = [];
+    byLevel(merged('kanji'), kl).forEach(function (k) {
+      (k.examples || []).forEach(function (e, i) {
+        if (!e || !e.word || have[e.word]) return;
+        have[e.word] = true;
+        out.push({
+          id: 'kex_' + (k.id || k.kanji) + '_' + i,
+          jp: e.word, rd: e.reading || '', mm: e.meaning || '',
+          chapter: k.chapter || 0, chapterTitle: k.chapterTitle || '',
+          level: k.level || 'N5', kex: k.kanji
+        });
+      });
+    });
+    return out;
   }
   /* every page that wants the level picker just includes <div id="level-bar"></div> */
   function mountLevelBar() {
@@ -1316,7 +1340,7 @@ window.JL = (function () {
     pref: pref, chapters: chapters, chapterTitle: chapterTitle, kimg: { get: kimgGet, set: kimgSet }, mmfix: mmfixValue,
     t: tt, translateNode: translateNode, watchLang: watchLang, lang: { get: langPref, set: setLang },
     applyTheme: applyTheme, theme: { get: getTheme, set: setTheme, toggle: toggleTheme },
-    level: level, setLevel: setLevel, byLevel: byLevel, levelBar: mountLevelBar, LEVELS: LEVELS
+    level: level, setLevel: setLevel, byLevel: byLevel, kexVocab: kexVocab, levelBar: mountLevelBar, LEVELS: LEVELS
   };
 })();
 document.addEventListener('DOMContentLoaded', function () { try { document.documentElement.setAttribute('data-lang', langPref()); } catch (e) {} JL.applyTheme(); JL.renderNav(); JL.initRouter(); JL.initCatToggle(); JL.levelBar(); JL.titleIcons(); JL.translateNode(document.body); JL.watchLang(); JL.sync.pull(); JL.sync.live(); });

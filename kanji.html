@@ -96,6 +96,31 @@
   var state = { chapter: 0, q: '' };
   var view = 'chapters', selectMode = false;
 
+  /* open one chapter's kanji grid (0 = All kanji) — shared by the chapter
+     cards and the ?ch= deep link below */
+  function openChapterView(n) {
+    state.chapter = n;
+    view = 'kanji';
+    document.getElementById('chapter-grid').style.display = 'none';
+    document.getElementById('chapter-view').style.display = '';
+    var c = chapters.filter(function (x) { return x.n === n; })[0];
+    document.getElementById('cur-chapter-title').textContent = n ? (n + '章 ' + (c ? c.t : '')) : 'All kanji';
+    renderGrid();
+  }
+
+  /* keep the URL in sync with the current view (replace, never push — the
+     browser back stack stays untouched): ?ch=N for a chapter view, ?q=… for
+     a search, plus an optional extra part (the ?k= detail deep link).
+     Browser-back from the writing page and page refresh then return to
+     THIS view instead of resetting to the top chapter list. */
+  function syncUrl(extra) {
+    var qs = [];
+    if (view === 'kanji' && !state.q) qs.push('ch=' + state.chapter);
+    if (state.q) qs.push('q=' + encodeURIComponent(state.q));
+    if (extra) qs.push(extra);
+    try { history.replaceState(history.state, '', qs.length ? '?' + qs.join('&') : location.pathname); } catch (e) {}
+  }
+
   /* chapter buttons — kanji live under their chapter, shown on tap */
   function renderChapters() {
     var el = document.getElementById('chapter-grid');
@@ -106,21 +131,14 @@
           '<span class="ch-title jp">' + JL.esc(c.t) + '</span><span class="ch-count">' + cnt + ' kanji</span></div>';
       }).join('');
     Array.prototype.forEach.call(el.querySelectorAll('.chapter-card'), function (b) {
-      b.onclick = function () {
-        state.chapter = parseInt(b.dataset.n, 10);
-        view = 'kanji';
-        document.getElementById('chapter-grid').style.display = 'none';
-        document.getElementById('chapter-view').style.display = '';
-        var c = chapters.filter(function (x) { return x.n === state.chapter; })[0];
-        document.getElementById('cur-chapter-title').textContent = state.chapter ? (state.chapter + '章 ' + (c ? c.t : '')) : 'All kanji';
-        renderGrid();
-      };
+      b.onclick = function () { openChapterView(parseInt(b.dataset.n, 10)); syncUrl(); };
     });
   }
   document.getElementById('back-chapters').onclick = function () {
     view = 'chapters'; state.q = ''; document.getElementById('k-search').value = '';
     document.getElementById('chapter-view').style.display = 'none';
     document.getElementById('chapter-grid').style.display = '';
+    syncUrl();
   };
   document.getElementById('k-select-mode').onclick = function () {
     selectMode = !selectMode;
@@ -247,9 +265,10 @@
     /* keep the open kanji in the URL by REPLACING the current entry (never
        push a new one): pushing made closeDetail call history.back(), whose
        popstate re-rendered the whole page and dumped the user back on the
-       chapter list. With replace, browser-back from the writing page still
-       lands on ?k=X and re-opens this detail via the deep link below. */
-    try { history.replaceState(history.state, '', '?k=' + encodeURIComponent(k.kanji)); } catch (e) {}
+       chapter list. The view state (ch/q) rides along, so browser-back from
+       the writing page returns to THIS chapter's view with this detail
+       re-opened via the deep link below. */
+    syncUrl('k=' + encodeURIComponent(k.kanji));
   }
 
   /* per-kanji memory image: upload, pick from files, change, remove */
@@ -326,17 +345,38 @@
   }
   function closeDetail() {
     document.getElementById('k-modal').classList.add('hidden');
-    /* strip the ?k= deep link in place — never history.back() here: popstate
-       would re-render the whole page and reset the user back to the chapter
-       list, losing the chapter view / search / scroll they were on */
+    /* strip only the ?k= part — the ?ch=/?q= view state stays in the URL so
+     the user's place survives back/forward and refresh. Never history.back()
+     here: popstate would re-render the whole page and reset the view. */
     if (/[?&]k=/.test(location.search)) {
-      try { history.replaceState(history.state, '', location.pathname); } catch (e) {}
+      var kept = location.search.slice(1).split('&').filter(function (p) { return p && p.indexOf('k=') !== 0; });
+      try { history.replaceState(history.state, '', kept.length ? '?' + kept.join('&') : location.pathname); } catch (e) {}
     }
   }
   document.getElementById('k-modal-close').onclick = closeDetail;
   document.getElementById('k-modal').onclick = function (e) {
     if (e.target === document.getElementById('k-modal')) closeDetail();
   };
+
+  /* view-state deep link: ?ch=N reopens chapter N's grid, ?q=… reopens the
+     search — so browser-back from the writing page (and refresh) returns
+     the user to the view they left, not the top chapter list. Runs before
+     the ?k= detail deep link so the modal opens on top of the right view. */
+  (function () {
+    var mQ = location.search.match(/[?&]q=([^&]*)/);
+    var mCh = location.search.match(/[?&]ch=(\d+)/);
+    if (mQ) {
+      state.q = decodeURIComponent(mQ[1]);
+      document.getElementById('k-search').value = state.q;
+      view = 'kanji';
+      document.getElementById('chapter-grid').style.display = 'none';
+      document.getElementById('chapter-view').style.display = '';
+      document.getElementById('cur-chapter-title').textContent = 'Search results';
+      renderGrid();
+    } else if (mCh) {
+      openChapterView(parseInt(mCh[1], 10));
+    }
+  })();
 
   /* deep link: kanji.html?k=X opens X's detail directly (also used by
      browser-back from the writing page) */
@@ -356,6 +396,7 @@
       document.getElementById('cur-chapter-title').textContent = 'Search results';
     }
     if (view === 'kanji') renderGrid();
+    syncUrl();
   };
 
   /* tabs */

@@ -96,25 +96,9 @@
   var ALL = JL.byLevel(JL.data('vocab'));
 
   /* example words inserted on kanji also appear here as vocabulary, under
-     the kanji's chapter — derived on the fly (never saved to the store), so
-     example edits made on the kanji page show up here instantly; deduped
-     against real words and among themselves */
-  (function () {
-    var have = {};
-    ALL.forEach(function (v) { if (v.jp) have[v.jp] = true; });
-    JL.byLevel(JL.data('kanji')).forEach(function (k) {
-      (k.examples || []).forEach(function (e, i) {
-        if (!e || !e.word || have[e.word]) return;
-        have[e.word] = true;
-        ALL.push({
-          id: 'kex_' + (k.id || k.kanji) + '_' + i,
-          jp: e.word, rd: e.reading || '', mm: e.meaning || '',
-          chapter: k.chapter || 0, chapterTitle: k.chapterTitle || '',
-          level: k.level || 'N5', kex: k.kanji
-        });
-      });
-    });
-  })();
+     the kanji's chapter — derived on the fly by JL.kexVocab (shared with the
+     Add/Edit page's list so both pages' counts always agree) */
+  JL.kexVocab().forEach(function (v) { ALL.push(v); });
 
   /* chapter list built from THIS page's words (real vocab + kanji example
      words), so a chapter that only has example words still shows up */
@@ -138,6 +122,32 @@
   var state = { cat: '', q: '' };
   var view = 'chapters', selectMode = false;
 
+  /* open a word list — shared by the chapter cards and the ?ch= deep link
+     below. cat: '' = All words, '__essential__', or a chapter number. */
+  function openWordsView(cat) {
+    state.cat = cat;
+    view = 'words';
+    document.getElementById('chapter-grid').style.display = 'none';
+    document.getElementById('chapter-view').style.display = '';
+    var ch = localChapters().filter(function (c) { return String(c.n) === cat; })[0];
+    document.getElementById('cur-chapter-title').textContent =
+      cat === '' ? 'All words' :
+      cat === '__essential__' ? 'Essential & my words' :
+      (ch ? ch.n + '章 ' + ch.t : '');
+    renderGrid();
+  }
+
+  /* keep the URL in sync with the current view (replace, never push — the
+     browser back stack stays untouched): ?ch=N / ?ch=ess / ?ch=all for a
+     word list, ?q=… for a search. Browser-back from the writing page and
+     page refresh then return to THIS view instead of the top chapter list. */
+  function syncUrl() {
+    var qs = [];
+    if (view === 'words' && !state.q) qs.push('ch=' + (state.cat === '__essential__' ? 'ess' : (state.cat === '' ? 'all' : state.cat)));
+    if (state.q) qs.push('q=' + encodeURIComponent(state.q));
+    try { history.replaceState(history.state, '', qs.length ? '?' + qs.join('&') : location.pathname); } catch (e) {}
+  }
+
   /* chapter buttons — words live under their chapter, shown on tap */
   function renderChapters() {
     var el = document.getElementById('chapter-grid');
@@ -150,24 +160,14 @@
       }).join('') +
       '<div class="chapter-card" data-c=""><span class="ch-num">📖</span><span class="ch-title">All words</span><span class="ch-count">' + ALL.length + ' words</span></div>';
     Array.prototype.forEach.call(el.querySelectorAll('.chapter-card'), function (b) {
-      b.onclick = function () {
-        state.cat = b.dataset.c;
-        view = 'words';
-        document.getElementById('chapter-grid').style.display = 'none';
-        document.getElementById('chapter-view').style.display = '';
-        var ch = localChapters().filter(function (c) { return String(c.n) === state.cat; })[0];
-        document.getElementById('cur-chapter-title').textContent =
-          state.cat === '' ? 'All words' :
-          state.cat === '__essential__' ? 'Essential & my words' :
-          (ch ? ch.n + '章 ' + ch.t : '');
-        renderGrid();
-      };
+      b.onclick = function () { openWordsView(b.dataset.c); syncUrl(); };
     });
   }
   document.getElementById('back-chapters').onclick = function () {
     view = 'chapters'; state.q = ''; document.getElementById('v-search').value = '';
     document.getElementById('chapter-view').style.display = 'none';
     document.getElementById('chapter-grid').style.display = '';
+    syncUrl();
   };
   document.getElementById('v-select-mode').onclick = function () {
     selectMode = !selectMode;
@@ -311,6 +311,7 @@
       document.getElementById('cur-chapter-title').textContent = 'Search results';
     }
     if (view === 'words') renderGrid();
+    syncUrl();
   };
 
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
@@ -381,6 +382,25 @@
     if (!qs.length) { JL.toast('No words in this scope to practice.'); return; }
     JL.quiz(document.getElementById('blank-area'), qs, { title: 'Fill in the blank' });
   };
+
+  /* view-state deep link: ?ch=N (or ch=ess / ch=all) reopens that word
+     list, ?q=… reopens the search — so browser-back from the writing page
+     (and refresh) returns the user to the view they left, not the top list */
+  (function () {
+    var mQ = location.search.match(/[?&]q=([^&]*)/);
+    var mCh = location.search.match(/[?&]ch=([a-z0-9]+)/);
+    if (mQ) {
+      state.q = decodeURIComponent(mQ[1]);
+      document.getElementById('v-search').value = state.q;
+      view = 'words';
+      document.getElementById('chapter-grid').style.display = 'none';
+      document.getElementById('chapter-view').style.display = '';
+      document.getElementById('cur-chapter-title').textContent = 'Search results';
+      renderGrid();
+    } else if (mCh) {
+      openWordsView(mCh[1] === 'ess' ? '__essential__' : (mCh[1] === 'all' ? '' : mCh[1]));
+    }
+  })();
 
   buildScope();
   renderChapters();

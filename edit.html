@@ -220,12 +220,27 @@
       if (vLCh && (v.chapter || 0) !== vLCh) return false;
       return !q || [v.jp, v.rd, v.en, v.mm, v.cat].join(' ').toLowerCase().indexOf(q) >= 0;
     }).slice(0, 400);
-    document.getElementById('v-list-count').textContent = all.length + ' words total (showing ' + items.length + ')';
+    /* kanji example words are listed here too — read-only, derived from the
+       kanji data by JL.kexVocab (the same helper the Vocabulary page uses),
+       so this list's counts match the main Vocabulary page. They have no
+       edit/delete buttons; add or edit them on the kanji's examples. */
+    var kexAll = JL.kexVocab();
+    var kexItems = kexAll.filter(function (v) {
+      if (lvF && (v.level || 'N5') !== lvF) return false;
+      if (vLCh && (v.chapter || 0) !== vLCh) return false;
+      return !q || [v.jp, v.rd, v.mm].join(' ').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 400);
+    document.getElementById('v-list-count').textContent = all.length + ' words total' +
+      (kexAll.length ? ' + ' + kexAll.length + ' kanji examples (read-only)' : '') +
+      ' (showing ' + (items.length + kexItems.length) + ')';
     var el = document.getElementById('v-list');
         el.innerHTML = '<table class="list"><tr><th>Japanese</th><th>Reading</th><th>Meaning</th><th>Category</th><th></th></tr>' +
       items.map(function (v) {
         return '<tr><td class="jp"><b>' + JL.esc(v.jp) + '</b> <span class="lvl-badge">' + (v.level || 'N5') + '</span></td><td class="jp">' + JL.esc(v.rd || '') + '</td><td><span class="jp">' + JL.esc(v.mm || v.en || '') + '</span></td><td class="muted">' + (v.chapter ? v.chapter + '章 ' : '') + JL.esc(v.cat || '') + '</td>' +
           '<td><button class="btn small" data-edit="' + v.id + '">✏️</button> <button class="btn small ghost" data-del="' + v.id + '">🗑</button></td></tr>';
+      }).join('') +
+      kexItems.map(function (v) {
+        return '<tr><td class="jp"><b>' + JL.esc(v.jp) + '</b> <span class="lvl-badge">' + (v.level || 'N5') + '</span></td><td class="jp">' + JL.esc(v.rd || '') + '</td><td><span class="jp">' + JL.esc(v.mm || '') + '</span></td><td class="muted">' + (v.chapter ? v.chapter + '章 ' : '') + '<span class="jp">例</span> <span class="jp">' + JL.esc(v.kex) + '</span></td><td class="muted small">—</td></tr>';
       }).join('') + '</table>';
     Array.prototype.forEach.call(el.querySelectorAll('[data-edit]'), function (b) {
       b.onclick = function () {
