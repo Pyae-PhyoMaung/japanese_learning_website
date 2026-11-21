@@ -804,7 +804,10 @@ window.JL = (function () {
       grid();
       if (show !== false && ch) {
         gctx.fillStyle = 'rgba(29,53,87,0.13)';
-        gctx.font = Math.floor(size * 0.8) + 'px "Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif';
+        /* scale font by character count so multi-char guides (拗音 digraphs
+           like きゃ, vocabulary words) fit the canvas instead of overflowing */
+        var n = Math.max(1, String(ch).length);
+        gctx.font = Math.floor(size * 0.8 / n) + 'px "Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif';
         gctx.textAlign = 'center'; gctx.textBaseline = 'middle';
         gctx.fillText(ch, size / 2, size / 2 + size * 0.03);
       }
