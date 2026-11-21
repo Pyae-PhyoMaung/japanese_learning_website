@@ -80,7 +80,7 @@
       ['だ行', 'だぢづでど', 'da ji zu de do'],
       ['ば行', 'ばびぶべぼ', 'ba bi bu be bo'],
       ['ぱ行', 'ぱぴぷぺぽ', 'pa pi pu pe po'],
-      ['拗音', 'きゃきゅきょしゃしゅしょちゃちゅちょにゃにゅにょひゃひゅひょみゃみゅみょりゃりゅりょぎゃぎゅぎょじゃじゅじょびゃびゅびょぴゃぴゅぴょ',
+      ['拗音', 'きゃ きゅ きょ しゃ しゅ しょ ちゃ ちゅ ちょ にゃ にゅ にょ ひゃ ひゅ ひょ みゃ みゅ みょ りゃ りゅ りょ ぎゃ ぎゅ ぎょ じゃ じゅ じょ びゃ びゅ びょ ぴゃ ぴゅ ぴょ',
        'kya kyu kyo sha shu sho cha chu cho nya nyu nyo hya hyu hyo mya myu myo rya ryu ryo gya gyu gyo ja ju jo bya byu byo pya pyu pyo']
     ],
     katakana: [
@@ -99,7 +99,7 @@
       ['ダ行', 'ダヂヅデド', 'da ji zu de do'],
       ['バ行', 'バビブベボ', 'ba bi bu be bo'],
       ['パ行', 'パピプペポ', 'pa pi pu pe po'],
-      ['拗音', 'キャキュキョシャシュショチャチュチョニャニュニョヒャヒュヒョミャミュミョリャリュリョギャギュギョジャジュジョビャビュビョピャピュピョ',
+      ['拗音', 'キャ キュ キョ シャ シュ ショ チャ チュ チョ ニャ ニュ ニョ ヒャ ヒュ ヒョ ミャ ミュ ミョ リャ リュ リョ ギャ ギュ ギョ ジャ ジュ ジョ ビャ ビュ ビョ ピャ ピュ ピョ',
        'kya kyu kyo sha shu sho cha chu cho nya nyu nyo hya hyu hyo mya myu myo rya ryu ryo gya gyu gyo ja ju jo bya byu byo pya pyu pyo']
     ]
   };
@@ -107,7 +107,7 @@
   Object.keys(DATA).forEach(function (t) {
     KANA[t] = [];
     DATA[t].forEach(function (row) {
-      var chars = row[1].split('');
+      var chars = row[1].indexOf(' ') >= 0 ? row[1].split(' ') : row[1].split('');
       var roms = row[2].split(' ');
       chars.forEach(function (c, i) { KANA[t].push({ c: c, r: roms[i] || '', row: row[0] }); });
     });

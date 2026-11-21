@@ -94,6 +94,44 @@
 <script>
 (function () {
   var ALL = JL.byLevel(JL.data('vocab'));
+
+  /* example words inserted on kanji also appear here as vocabulary, under
+     the kanji's chapter — derived on the fly (never saved to the store), so
+     example edits made on the kanji page show up here instantly; deduped
+     against real words and among themselves */
+  (function () {
+    var have = {};
+    ALL.forEach(function (v) { if (v.jp) have[v.jp] = true; });
+    JL.byLevel(JL.data('kanji')).forEach(function (k) {
+      (k.examples || []).forEach(function (e, i) {
+        if (!e || !e.word || have[e.word]) return;
+        have[e.word] = true;
+        ALL.push({
+          id: 'kex_' + (k.id || k.kanji) + '_' + i,
+          jp: e.word, rd: e.reading || '', mm: e.meaning || '',
+          chapter: k.chapter || 0, chapterTitle: k.chapterTitle || '',
+          level: k.level || 'N5', kex: k.kanji
+        });
+      });
+    });
+  })();
+
+  /* chapter list built from THIS page's words (real vocab + kanji example
+     words), so a chapter that only has example words still shows up */
+  function localChapters() {
+    var seen = {}, out = [];
+    ALL.forEach(function (v) {
+      var n = Number(v.chapter) || 0;
+      if (!n) return;
+      if (!seen[n]) { seen[n] = { n: n, t: '', count: 0 }; out.push(seen[n]); }
+      if (!seen[n].t && v.chapterTitle) seen[n].t = v.chapterTitle;
+      seen[n].count++;
+    });
+    out.forEach(function (c) { c.t = JL.chapterTitle('vocab', c.n, c.t); });
+    out.sort(function (a, b) { return a.n - b.n; });
+    return out;
+  }
+
   var cats = [];
   ALL.forEach(function (v) { if (v.cat && cats.indexOf(v.cat) < 0) cats.push(v.cat); });
 
@@ -103,7 +141,7 @@
   /* chapter buttons — words live under their chapter, shown on tap */
   function renderChapters() {
     var el = document.getElementById('chapter-grid');
-    var chs = JL.chapters('vocab');
+    var chs = localChapters();
     var nEss = ALL.filter(function (v) { return !v.chapter; }).length;
     el.innerHTML = '<div class="chapter-card" data-c="__essential__"><span class="ch-num">★</span><span class="ch-title">Essential &amp; my words</span><span class="ch-count">' + nEss + ' words</span></div>' +
       chs.filter(function (c) { return c.n > 0; }).map(function (c) {
@@ -117,7 +155,7 @@
         view = 'words';
         document.getElementById('chapter-grid').style.display = 'none';
         document.getElementById('chapter-view').style.display = '';
-        var ch = JL.chapters('vocab').filter(function (c) { return String(c.n) === state.cat; })[0];
+        var ch = localChapters().filter(function (c) { return String(c.n) === state.cat; })[0];
         document.getElementById('cur-chapter-title').textContent =
           state.cat === '' ? 'All words' :
           state.cat === '__essential__' ? 'Essential & my words' :
@@ -151,7 +189,7 @@
   function renderChips(elId) {
     var el = document.getElementById(elId);
     el.innerHTML = '<button class="chip' + (state.cat === '' ? ' active' : '') + '" data-c="">All (' + ALL.length + ')</button>' +
-      JL.chapters('vocab').map(function (c) {
+      localChapters().map(function (c) {
         var t = c.n ? (c.n + '章 ' + c.t) : c.t;
         return '<button class="chip' + (String(c.n) === state.cat ? ' active' : '') + '" data-c="' + c.n + '">' + JL.esc(t) + ' (' + c.count + ')</button>';
       }).join('');
@@ -183,7 +221,7 @@
      shared by Flashcards / Quiz / Fill in the blank (replaces the old chips) */
   function buildScope() {
     var el = document.getElementById('p-scope');
-    var chs = JL.chapters('vocab');
+    var chs = localChapters();
     var nEss = ALL.filter(function (v) { return !v.chapter; }).length;
     el.innerHTML = '<option value="all">All words (' + ALL.length + ')</option>' +
       '<option value="__essential__">Essential &amp; my words (' + nEss + ')</option>' +
@@ -205,8 +243,11 @@
     var grid = document.getElementById('v-grid');
     grid.classList.toggle('select-mode', selectMode);
     grid.innerHTML = list.map(function (v) {
+      /* kanji-example words are derived — they have no real vocab id, so they
+         can't be ticked for Learn (learn.html reads the real vocab store) */
+      var selable = v.id && String(v.id).indexOf('kex_') !== 0;
       return '<div class="vocab-card" data-id="' + JL.esc(v.id || '') + '">' +
-        '<input type="checkbox" class="sel-check" data-sel="' + JL.esc(v.id || '') + '"' + (v.id && sel.indexOf(v.id) >= 0 ? ' checked' : '') + ' title="Select for Learn">' +
+        (selable ? '<input type="checkbox" class="sel-check" data-sel="' + JL.esc(v.id) + '"' + (sel.indexOf(v.id) >= 0 ? ' checked' : '') + ' title="Select for Learn">' : '') +
         '<span class="vw jp">' + JL.esc(v.jp) + '</span>' +
         '<span class="vr jp">' + JL.esc(v.rd || '') + '</span>' +
         '<span class="vmn"><span class="jp">' + JL.esc(v.mm || '') + '</span>' + (v.en ? ' <span class="muted">' + JL.esc(v.en) + '</span>' : '') + '</span></div>';
@@ -247,6 +288,7 @@
       '<p style="text-align:center" class="jp"><b>' + JL.esc(v.rd || '') + '</b>' + (v.romaji ? ' <span class="muted">' + JL.esc(v.romaji) + '</span>' : '') + '</p>' +
       '<p style="text-align:center"><span class="jp">' + JL.esc(v.mm || '') + '</span>' + (v.en ? ' · <b>' + JL.esc(v.en) + '</b>' : '') + '</p>' +
       '<p style="text-align:center" class="muted small">' + (v.chapter ? v.chapter + '章 ' + JL.esc(JL.chapterTitle('vocab', v.chapter, v.chapterTitle)) : JL.esc(v.cat || '')) + '</p>' +
+      (v.kex ? '<p style="text-align:center" class="muted small">📖 Example word from kanji <a class="jp" href="kanji.html?k=' + encodeURIComponent(v.kex) + '">' + JL.esc(v.kex) + '</a></p>' : '') +
       '<div style="text-align:center;margin:6px 0 10px">' +
       '<button class="btn" data-say="' + JL.esc(v.jp) + '">🔊 Listen to the word</button> ' +
       '<a class="btn primary" href="write.html?tab=vocab&v=' + encodeURIComponent(v.jp) + '">✍️ Practice writing</a></div>';

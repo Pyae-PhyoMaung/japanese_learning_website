@@ -95,7 +95,6 @@
 
   var state = { chapter: 0, q: '' };
   var view = 'chapters', selectMode = false;
-  var pushedK = false; /* true when openDetail pushed a ?k= history entry */
 
   /* chapter buttons — kanji live under their chapter, shown on tap */
   function renderChapters() {
@@ -245,12 +244,12 @@
     });
     renderImgBox(k);
     document.getElementById('k-modal').classList.remove('hidden');
-    /* remember the open kanji in the URL so browser-back from the writing
-       page returns to THIS kanji's detail (not the whole list) */
-    try {
-      if (fromUrl) history.replaceState(history.state, '', '?k=' + encodeURIComponent(k.kanji));
-      else { history.pushState({ k: k.kanji }, '', '?k=' + encodeURIComponent(k.kanji)); pushedK = true; }
-    } catch (e) {}
+    /* keep the open kanji in the URL by REPLACING the current entry (never
+       push a new one): pushing made closeDetail call history.back(), whose
+       popstate re-rendered the whole page and dumped the user back on the
+       chapter list. With replace, browser-back from the writing page still
+       lands on ?k=X and re-opens this detail via the deep link below. */
+    try { history.replaceState(history.state, '', '?k=' + encodeURIComponent(k.kanji)); } catch (e) {}
   }
 
   /* per-kanji memory image: upload, pick from files, change, remove */
@@ -327,9 +326,11 @@
   }
   function closeDetail() {
     document.getElementById('k-modal').classList.add('hidden');
-    if (location.search.indexOf('k=') >= 0) {
-      if (pushedK) { pushedK = false; history.back(); } /* popstate re-renders the list */
-      else try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    /* strip the ?k= deep link in place — never history.back() here: popstate
+       would re-render the whole page and reset the user back to the chapter
+       list, losing the chapter view / search / scroll they were on */
+    if (/[?&]k=/.test(location.search)) {
+      try { history.replaceState(history.state, '', location.pathname); } catch (e) {}
     }
   }
   document.getElementById('k-modal-close').onclick = closeDetail;

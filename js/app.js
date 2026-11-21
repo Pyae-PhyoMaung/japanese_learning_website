@@ -1208,6 +1208,7 @@ window.JL = (function () {
     '🔊 Listen to the word': '🔊 စကားလုံးကို နားထောင်ရန်', '🔊 Listen to word': '🔊 စကားလုံးကို နားထောင်ရန်',
     '🔊 Listen to the kanji': '🔊 ခန်းဂျိကို နားထောင်ရန်',
     '✍️ Practice writing': '✍️ စာရေး လေ့ကျင့်မည်', '✍️ Write it': '✍️ ရေးပါ',
+    '📖 Example word from kanji': '📖 ခန်းဂျိ၏ ဥပမာစကားလုံး',
     '↩ Back': '↩ နောက်သို့', '🔄 Change image': '🔄 ပုံ ပြောင်းမည်', '🗑 Remove': '🗑 ဖယ်ရှားမည်',
     '⬆️ Upload image': '⬆️ ပုံ တင်မည်', '🗂️ Pick from my files': '🗂️ ဖိုင်များမှ ရွေးမည်',
     '➖ Zoom out': '➖ ချုံ့ရန်', '➕ Zoom in': '➕ ချဲ့မည်', '↺ 100%': '↺ ၁၀၀%',
